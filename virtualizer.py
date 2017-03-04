@@ -1181,41 +1181,36 @@ def readConfigurationFile():
 		LOG.error("Wrong file '%s'. It does not include the section 'connections' :(",constants.CONFIGURATION_FILE)
 		return False
 	try:
-		nameResolverURL = nameResolverURL + config.get("connections","NameResolverAddress") + ":" + config.get("connections","NameResolverPort")
+		unOrchestratorIP = config.get("connections","Frog4OrchestratorAddress")
+		unOrchestratorURL = unOrchestratorURL + unOrchestratorIP + ":" + config.get("connections","Frog4OrchestratorPort")
 	except:
-		LOG.error("Option 'NameResolverAddress' or option 'NameResolverPort' not found in section 'connections' of file '%s'",constants.CONFIGURATION_FILE)
-		return False
-	try:
-		unOrchestratorIP = config.get("connections","UNOrchestratorAddress")
-		unOrchestratorURL = unOrchestratorURL + unOrchestratorIP + ":" + config.get("connections","UNOrchestratorPort")
-	except:
-		LOG.error("Option 'UNOrchestratorAddress' or option 'UNOrchestratorPort' not found in section 'connections' of file '%s'",constants.CONFIGURATION_FILE)
+		LOG.error("Option 'Frog4OrchestratorAddress' or option 'Frog4OrchestratorPort' not found in section 'connections' of file '%s'",constants.CONFIGURATION_FILE)
 		return False
 	
-	if 'un-orchestrator authentication' not in sections:
-		LOG.error("Wrong file '%s'. It does not include the section 'un-orchestrator authentication' :(",constants.CONFIGURATION_FILE)
+	if 'orchestrator authentication' not in sections:
+		LOG.error("Wrong file '%s'. It does not include the section 'orchestrator authentication' :(",constants.CONFIGURATION_FILE)
 		return False
 	try:
-		authentication = config.getboolean("un-orchestrator authentication","authentication")
+		authentication = config.getboolean("orchestrator authentication","authentication")
 	except:
-		LOG.error("Option 'authentication' not found in section 'un-orchestrator authentication' of file '%s'",constants.CONFIGURATION_FILE)
+		LOG.error("Option 'authentication' not found in section 'orchestrator authentication' of file '%s'",constants.CONFIGURATION_FILE)
 		return False
 	if authentication is True:
 		try:
-			username = config.get("un-orchestrator authentication","username")
-			password = config.get("un-orchestrator authentication","password")	
+			username = config.get("orchestrator authentication","username")
+			password = config.get("orchestrator authentication","password")	
 		except:
-			LOG.error("Option 'username' or 'password' not found in section 'un-orchestrator authentication' of file '%s'",constants.CONFIGURATION_FILE)
+			LOG.error("Option 'username' or 'password' not found in section 'orchestrator authentication' of file '%s'",constants.CONFIGURATION_FILE)
 			return False
 	else :
 		#autentication is false, but this is the case virtualizer interact with frog
 		try:
-			username = config.get("un-orchestrator authentication","username")
-			password = config.get("un-orchestrator authentication","password")
-			tenant = config.get("un-orchestrator authentication","tenant")
+			username = config.get("orchestrator authentication","username")
+			password = config.get("orchestrator authentication","password")
+			tenant = config.get("orchestrator authentication","tenant")
 			headers = {'Content-Type': 'application/json', 'X-Auth-User': username, 'X-Auth-Pass': password, 'X-Auth-Tenant': tenant}
 		except:
-			LOG.error("Option 'username' or 'password' or 'tenant' not found in section 'un-orchestrator authentication' of file '%s'",constants.CONFIGURATION_FILE)
+			LOG.error("Option 'username' or 'password' or 'tenant' not found in section 'orchestrator authentication' of file '%s'",constants.CONFIGURATION_FILE)
                         return False
 	if 'resources' not in sections:
 		LOG.error("Wrong file '%s'. It does not include the section 'resources' :(",constants.CONFIGURATION_FILE)
