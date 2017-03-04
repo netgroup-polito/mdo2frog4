@@ -1,0 +1,17 @@
+<node>
+	<id>cirros</id>
+	<name>prova</name>
+	<type>cirros</type>
+	<ports>
+		<port>
+			<id>1</id>
+			<name>VNF port 1</name>
+			<port_type>port-sap</port_type>
+		</port>
+		<port>
+			<id>2</id>
+			<name>VNF port 2</name>
+			<port_type>port-sap</port_type>
+		</port>
+	</ports>
+</node>
