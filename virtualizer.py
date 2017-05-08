@@ -101,24 +101,25 @@ class DoEditConfig:
 			# check if this request comes from Escape
 			content = req.stream.read()
 			
-			if checkIfEscapeNFFG(content):
+			#if checkIfEscapeNFFG(content):
 			# this is a mapped nffg request from Escape
 			#	nffg_file = 'er_nffg_virtualizer5_vdurak.xml'
 			#	LOG.debug("Reading file: %s", nffg_file)
 			#	tmpFile = open(nffg_file, "r")
 			#	content = tmpFile.read()
 			#	tmpFile.close()
-				content = adjustEscapeNffg(content)
+			content = adjustEscapeNffg(content)
 			#content = req.stream.read()
 			#content = req
-			
-			LOG.debug("Body of the request:")
+		 	LOG.debug("Body of the request after adjust:")
+                        LOG.debug("%s",content)	
+			checkCorrectness(content)
+			LOG.debug("Body of the request adter check:")
 			LOG.debug("%s",content)
 			
 			#TODO: check that flows refer to existing (i.e., deployed) network function.
 			#TODO: check that flows refer to existing ports 
 			
-			checkCorrectness(content)
 			
 			#
 			#	Extract the needed information from the message received from the network
@@ -1392,25 +1393,22 @@ def adjustEscapeNffg(content):
 	
 	#tmp.xml is the adjusted nffg coming from escape
 	#txt.xml is the incoming nffg from escape
-	LOG.debug("Adjusting the Escape Nffg")
+	#info.xml contain the information to add to escape nffg
+        LOG.debug("Adjusting the Escape Nffg")
 	with open("txt.xml", "w") as text_file:
 		text_file.write("%s" % content)
 
 	with open("tmp.xml", 'w') as outfile:
-		with open(constants.GRAPH_XML_FILE, 'r') as infile:
-        		rowIter= iter(infile)
-        		for row in rowIter:
+		with open("txt.xml", 'r') as infile_nffg:
+			rowIter = iter(infile_nffg)
+			for row in rowIter:
 				outfile.write("%s" % row)
-				if row.lstrip(' \t').startswith('</cap'):
-					break
-			with open("txt.xml", 'r') as infile1:
-				rowIter1= iter(infile1)
-        			flag='false'
-				for row in rowIter1:
-					if row.lstrip(' \t').startswith('<NF_instances'):
-						flag='true'
-					if flag == 'true':
-            					outfile.write("%s" % row)
+				if row.lstrip(' \t').startswith('<id>UUID11'):
+					with open(".info.xml", 'r') as infile:
+						rowIter1= iter(infile)
+						for row1 in rowIter1:
+							outfile.write("%s" % row1)
+	
 	with open("tmp.xml", 'r') as infile:
 		return infile.read()
 

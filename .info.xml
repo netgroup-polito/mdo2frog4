@@ -1,0 +1,15 @@
+			<name>Universal Node</name>
+			<type>BisBis</type>
+			<ports>
+				<port>
+					<id>1</id>
+					<name>External_port_1</name>
+					<port_type>port-abstract</port_type>
+				</port>
+				<port>
+					<id>2</id>
+					<name>External_port_2</name>
+					<port_type>port-sap</port_type>
+					<sap>sap2</sap>
+				</port>
+			</ports>
