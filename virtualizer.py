@@ -101,13 +101,6 @@ class DoEditConfig:
 			# check if this request comes from Escape
 			content = req.stream.read()
 			
-			#if checkIfEscapeNFFG(content):
-			# this is a mapped nffg request from Escape
-			#	nffg_file = 'er_nffg_virtualizer5_vdurak.xml'
-			#	LOG.debug("Reading file: %s", nffg_file)
-			#	tmpFile = open(nffg_file, "r")
-			#	content = tmpFile.read()
-			#	tmpFile.close()
 			content = adjustEscapeNffg(content)
 			#content = req.stream.read()
 			#content = req
@@ -389,7 +382,7 @@ def extractVNFsInstantiated(content):
 						unify_ip = l3_address.requested.get_as_text()
 
 				mac = port.addresses.l2.get_value()
-				port_id_nffg = int(port_id)-1
+				port_id_nffg = int(port_id)
 				port_list.append(Port(_id="port:"+str(port_id_nffg), unify_ip=unify_ip, mac=mac))
 			if port.control.orchestrator.get_as_text() is not None:
 				unify_env_variables.append("CFOR="+port.control.orchestrator.get_as_text())
@@ -452,6 +445,7 @@ def extractRules(content):
 	endpoints_dict["mgmt"] = EndPoint(_id="mgmt", _type="vlan",vlan_id="ti-mgmt", interface="eth0", name="management")
 
 	flowrules = []
+	'''
 	#Add the rules for the management endpoint
 	tmp_flowrule1 = FlowRule()
 	tmp_flowrule1.id = "M1A"
@@ -472,6 +466,7 @@ def extractRules(content):
 	tmp_flowrule2.match = tmp_match;
 	tmp_flowrule2.actions.append(tmp_action)
 	flowrules.append(tmp_flowrule2)
+	'''
 	#TODO: IDvlan now is forced to an initial value of 270, it will be dinamically get from the EscapeNffg in the next release 
 	IDvlan= 270
 	for flowentry in flowtable:		
@@ -1010,7 +1005,7 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 	try:
 		if len(nffg.flow_rules) + len(nffg.vnfs) + len(nffg.end_points) == 0:
 			LOG.debug("No elements have to be sent to the universal node orchestrator...sending a delete request")
-			LOG.debug("DELETE url: "+ graph_url % (nffg.id))
+			LOG.debug("DELETE url: %s %s", graph_url, nffg.id)
 			if debug_mode is False:
 				if authentication is True and token is None:
 					getToken()
@@ -1410,7 +1405,48 @@ def adjustEscapeNffg(content):
 							outfile.write("%s" % row1)
 	
 	with open("tmp.xml", 'r') as infile:
-		return infile.read()
+		#return infile.read()
+		newContent = infile.read().replace(';',',')
+	
+	try:
+		tree = ET.ElementTree(ET.fromstring(newContent))
+	except ET.ParseError as e:
+		print('ParseError: %s' % e.message)
+		raise ClientError("ParseError: %s" % e.message)
+
+	infrastructure = Virtualizer.parse(root=tree.getroot())
+	universal_node = infrastructure.nodes.node[constants.NODE_ID]
+	flowtable = universal_node.flowtable
+	for flowentry in flowtable:
+		if flowentry.get_operation() != "delete" and flowentry.get_operation() != "create":
+			flowtable.remove(flowentry)
+	for flowentry in flowtable:
+		if flowentry.action is not None:
+			flowentry.action = None
+		if flowentry.match is not None:
+			if type(flowentry.match.get_value()) is str:
+				adjusted_matches = ""
+                                matches = re.split(',| ', flowentry.match.data)
+                                for m in matches:
+                                	tokens = m.split("=")
+                                        elements = len(tokens)
+                                        if elements != 2:
+                                        	LOG.error("Incorrect match "+flowentry.match.data)
+                                                raise ClientError("Incorrect match")
+                                        #The match is in the form "name=value"
+                                        if not supportedMatch(tokens[0]):
+                                        	raise ClientError("Not supported match")
+                                        if tokens[0] == "dl_tag" or tokens[0] == "push_tag" or tokens[0] == "pop_tag":
+                                        	LOG.debug("Match deleted")
+                                        else:
+						if adjusted_matches == "":
+							adjusted_matches = adjusted_matches +  m
+						else:
+                                        		adjusted_matches = adjusted_matches + ',' +  m
+				flowentry.match.data = adjusted_matches
+                                LOG.debug(adjusted_matches)
+
+	return infrastructure.xml() 
 
 def loadTemplates():
 

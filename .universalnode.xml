@@ -29,7 +29,7 @@
 			<NF_instances>
 				<node>
 					<id>1</id>
-					<name>prova</name>
+					<name>auth</name>
 					<type>cirros</type>
 					<ports>
 						<port>
@@ -68,21 +68,18 @@
 			</capabilities>
 			<flowtable>
 				<flowentry>
-					<id>1</id>
+					<id>11</id>
 					<priority>100</priority>
 					<port>../../../NF_instances/node[id=1]/ports/port[id=1]</port>
-					<action>push_tag:0x0001</action>
 					<out>../../../ports/port[id=1]</out>
 					<resources>
 						<bandwidth>0.0</bandwidth>
 					</resources>
 				</flowentry>
 				<flowentry>
-					<id>2</id>
+					<id>12</id>
 					<priority>100</priority>
 					<port>../../../ports/port[id=1]</port>
-					<match>dl_tag=0x0002</match>
-					<action>pop_tag</action>
 					<out>../../../NF_instances/node[id=1]/ports/port[id=1]</out>
 					<resources>
 						<bandwidth>0.0</bandwidth>
