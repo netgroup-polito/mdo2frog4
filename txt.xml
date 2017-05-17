@@ -9,15 +9,6 @@
 				</node>
 			</NF_instances>
 			<flowtable>
-				<flowentry>
-					<id>11</id>
-					<action operation="create">push_tag:0x000b</action>
-				</flowentry>
-				<flowentry>
-					<id>12</id>
-					<match operation="create">dl_tag=0x000c</match>
-					<action operation="create">pop_tag</action>
-				</flowentry>
 				<flowentry operation="delete">
 					<id>21</id>
 				</flowentry>

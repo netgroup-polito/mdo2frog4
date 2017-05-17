@@ -264,7 +264,7 @@ def extractVNFsInstantiated(content):
 	of the NF to be instantiated is among those to be supported by the universal node
 	'''
 	
-	global tcp_port, unify_port_mapping, unify_monitoring
+	global graph_id, tcp_port, unify_port_mapping, unify_monitoring
 	
 	try:
 		tree = ET.parse(constants.GRAPH_XML_FILE)
@@ -314,7 +314,7 @@ def extractVNFsInstantiated(content):
 		elif instance.get_operation() != 'create':
 			LOG.error("Unsupported operation for vnf: " + instance.id.get_value())
 			raise ClientError("Unsupported operation for vnf: "+instance.id.get_value())
-			
+		graph_id=instance.id.get_value()	
 		vnfType = instance.type.get_value()
 		if vnfType not in supportedTypes:
 			LOG.error("VNF of type '%s' is not supported by the UN!",vnfType)
