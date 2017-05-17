@@ -5,7 +5,7 @@
 
 	<ports>
 		<port name="eth1">
-			<virtualized as="External_port_1" port-type="port-abstract" sap="sap1"/>
+			<virtualized as="of:000064e9505a82c0/5100" port-type="port-abstract" sap="sap1"/>
 		</port>
 		<port name="eth2">
 			<virtualized as="External_port_2" port-type="port-sap" sap="sap2"/>

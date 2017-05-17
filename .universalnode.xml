@@ -10,7 +10,7 @@
 			<ports>
 				<port>
 					<id>1</id>
-					<name>External_port_1</name>
+					<name>of:000064e9505a82c0/5100</name>
 					<port_type>port-abstract</port_type>
 					<sap>sap1</sap>
 				</port>
@@ -26,6 +26,25 @@
 				<mem>32 GB</mem>
 				<storage>5 TB</storage>
 			</resources>
+			<NF_instances>
+				<node>
+					<id>2</id>
+					<name>user</name>
+					<type>cirros</type>
+					<ports>
+						<port>
+							<id>1</id>
+							<name>ovs1_eth0</name>
+							<port_type>port-abstract</port_type>
+						</port>
+					</ports>
+					<resources>
+						<cpu>1.0</cpu>
+						<mem>1.0</mem>
+						<storage>0.0</storage>
+					</resources>
+				</node>
+			</NF_instances>
 			<capabilities>
 				<supported_NFs>
 					<node>
@@ -47,6 +66,27 @@
 					</node>
 				</supported_NFs>
 			</capabilities>
+			<flowtable>
+				<flowentry>
+					<id>21</id>
+					<priority>100</priority>
+					<port>../../../NF_instances/node[id=2]/ports/port[id=1]</port>
+					<out>../../../ports/port[id=1]</out>
+					<resources>
+						<bandwidth>0.0</bandwidth>
+					</resources>
+				</flowentry>
+				<flowentry>
+					<id>22</id>
+					<priority>100</priority>
+					<port>../../../ports/port[id=1]</port>
+					<match>ether_type=0x806,dest_mac=00:00:00:00:00:01</match>
+					<out>../../../NF_instances/node[id=2]/ports/port[id=1]</out>
+					<resources>
+						<bandwidth>0.0</bandwidth>
+					</resources>
+				</flowentry>
+			</flowtable>
 		</node>
 	</nodes>
 	<version>2016-02-24; compiled at 2016-03-18  19:56:13</version>

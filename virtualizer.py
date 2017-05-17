@@ -536,10 +536,25 @@ def extractRules(content):
 				raise ClientError("Physical port "+ port.name.get_value()+" is not present in the UN")
 			port_name = physicalPortsVirtualization[port.name.get_value()]
 			port_id = findEndPointId(universal_node, port.name.get_value())
-			if port_name not in endpoints_dict:
-				endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=IDvlan, interface=port_name,
-													 name=port.name.get_value())
-				IDvlan+=1
+			LOG.debug("port name: %s", port.name.get_value())
+			tokens= port.name.get_value().split('/')
+                        LOG.debug("node: %s", tokens[0])
+                        LOG.debug("interface: %s", tokens[1])
+			node_t = tokens[0]
+			interface_t = tokens[1]
+			#check the node id to understand the correct domain where the endpoint will be deployed
+			if 'of' in port.name.get_value():
+				if port_name not in endpoints_dict:
+					LOG.debug("It's an onos_domain endpoint")
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=interface_t,
+													 name=port.name.get_value(), node_id=node_t, domain='onos_domain')
+					IDvlan+=1
+					LOG.debug("%s", str(endpoints_dict[port_name]))
+			else:
+                                if port_name not in endpoints_dict:
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=interface_t,
+                                                                                                         name=port.name.get_value(), node_id=node_t)
+					IDvlan+=1
 			match.port_in = "endpoint:" + endpoints_dict[port_name].id
 		elif tokens[4] == 'NF_instances':
 			#This is a port of the NF. I have to extract the port ID and the type of the NF.
@@ -592,10 +607,25 @@ def extractRules(content):
 			#the real name of the port on the universal node
 			port_name = physicalPortsVirtualization[port.name.get_value()]
 			port_id = findEndPointId(universal_node, port.name.get_value())
-			if port_name not in endpoints_dict:
-				endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan", vlan_id=IDvlan, interface=port_name,
-													 name=port.name.get_value())
-				IDvlan+=1
+			LOG.debug("port name: %s", port.name.get_value())
+                        tokens= port.name.get_value().split('/')
+                        LOG.debug("node: %s", tokens[0])
+                        LOG.debug("interface: %s", tokens[1])
+                        node_t = tokens[0]
+                        interface_t = tokens[1]
+			if 'of' in port.name.get_value():
+                                if port_name not in endpoints_dict:
+                                        LOG.debug("It's an onos_domain endpoint")
+
+                                        endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain='onos_domain', _type="vlan",vlan_id=str(IDvlan), interface=interface_t, name=port.name.get_value(), node_id=node_t)
+                                        IDvlan+=1
+                                        LOG.debug(endpoints_dict[port_name].getDict(domain=True))
+                        else:
+                                if port_name not in endpoints_dict:
+                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=interface_t,
+                                                                                                         name=port.name.get_value(), node_id=node_t)
+                                        IDvlan+=1
+
 			flowrule.actions.append(Action(output = "endpoint:" + endpoints_dict[port_name].id))
 		elif tokens[4] == 'NF_instances':
 			#This is a port of the NF. I have to extract the port ID and the type of the NF.
@@ -1029,13 +1059,13 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 					raise ServerError("Something went wrong while deleting the graph on the universal node")
 		else:
 			LOG.debug("Graph that is going to be sent to the frog4 orchestrator:")
-			LOG.debug("%s",nffg.getJSON())
+			LOG.debug("%s",nffg.getJSON(domain=True))
 			LOG.debug("POST url: "+ graph_url)
 			
 			if debug_mode is False:
 				if authentication is True and token is None:
 					getToken()	
-				responseFromUN = requests.put(graph_url, data=nffg.getJSON(), headers=headers)
+				responseFromUN = requests.put(graph_url, data=nffg.getJSON(domain=True), headers=headers)
 				LOG.debug("Status code received from the frog4 orchestrator: %s",responseFromUN.status_code)
 			
 				if responseFromUN.status_code == 201:

@@ -3,7 +3,7 @@
 			<ports>
 				<port>
 					<id>1</id>
-					<name>External_port_1</name>
+					<name>of:000064e9505a82c0/5100</name>
 					<port_type>port-abstract</port_type>
 				</port>
 				<port>
