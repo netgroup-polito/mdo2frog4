@@ -308,7 +308,7 @@ def extractVNFsInstantiated(content):
 			#raise ClientError("Update of VNF is not supported by the UN! vnf: "+instance.id.get_value())
 
 		elif instance.get_operation() == 'delete':
-			#This network function has to be removed from the universal node
+			graph_id=instance.id.get_value()	
 			continue
 
 		elif instance.get_operation() != 'create':
@@ -1034,29 +1034,30 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 
 	try:
 		if len(nffg.flow_rules) + len(nffg.vnfs) + len(nffg.end_points) == 0:
-			LOG.debug("No elements have to be sent to the universal node orchestrator...sending a delete request")
+			LOG.debug("No elements have to be sent to Frog4 orchestrator...sending a delete request")
 			LOG.debug("DELETE url: %s %s", graph_url, nffg.id)
 			if debug_mode is False:
 				if authentication is True and token is None:
 					getToken()
-				responseFromUN = requests.delete(graph_url % (nffg.id), headers=headers)
-				LOG.debug("Status code received from the universal node orchestrator: %s",responseFromUN.status_code)
-				# TODO: check the correct code
-				if responseFromUN.status_code == 201: 
+				url = graph_url + nffg.id
+				LOG.debug("url for delete: " + url)
+				responseFromFrog = requests.delete(url, headers=headers)
+				LOG.debug("Status code received from the Frog4 orchestrator: %s",responseFromFrog.status_code)
+				if responseFromFrog.status_code == 200: 
 					LOG.info("Graph successfully deleted")
-				elif responseFromUN.status_code == 401:
+				elif responseFromFrog.status_code == 401:
 					LOG.debug("Token expired, getting a new one...")
 					getToken()
-					newresponseFromUN = requests.delete(graph_url % (nffg.id), headers=headers)
-					LOG.debug("Status code received from the universal node orchestrator: %s",newresponseFromUN.status_code)
-					if newresponseFromUN.status_code == 201: 
+					newresponseFromFrog = requests.delete(url, headers=headers)
+					LOG.debug("Status code received from the Frog orchestrator: %s",newresponseFromFrog.status_code)
+					if newresponseFromFrog.status_code == 200: 
 						LOG.info("Graph successfully deleted")
 					else:
-						LOG.error("Something went wrong while deleting the graph on the universal node")	
-						raise ServerError("Something went wrong while deleting the graph on the universal node")						
+						LOG.error("Something went wrong while deleting the graph on the Frog4 orchestrator")	
+						raise ServerError("Something went wrong while deleting the graph on the Frog4 orchestrator")						
 				else:
-					LOG.error("Something went wrong while deleting the graph on the universal node")	
-					raise ServerError("Something went wrong while deleting the graph on the universal node")
+					LOG.error("Something went wrong while deleting the graph on the Frog4 orchestrator")	
+					raise ServerError("Something went wrong while deleting the graph on the Frog4 orchestrator")
 		else:
 			LOG.debug("Graph that is going to be sent to the frog4 orchestrator:")
 			LOG.debug("%s",nffg.getJSON(domain=True))
@@ -1065,28 +1066,28 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 			if debug_mode is False:
 				if authentication is True and token is None:
 					getToken()	
-				responseFromUN = requests.put(graph_url, data=nffg.getJSON(domain=True), headers=headers)
-				LOG.debug("Status code received from the frog4 orchestrator: %s",responseFromUN.status_code)
+				responseFromFrog = requests.put(graph_url, data=nffg.getJSON(domain=True), headers=headers)
+				LOG.debug("Status code received from the frog4 orchestrator: %s",responseFromFrog.status_code)
 			
-				if responseFromUN.status_code == 201:
+				if responseFromFrog.status_code == 202:
 					LOG.info("New VNFs and flows properly deployed")
-				elif responseFromUN.status_code == 401:
+				elif responseFromFrog.status_code == 401:
 					LOG.debug("Token expired, getting a new one...")
 					getToken()
-					newresponseFromUN = requests.put(graph_url, data=nffg.getJSON(), headers=headers)
-					LOG.debug("Status code received from the frog4 orchestrator: %s",newresponseFromUN.status_code)
-					if newresponseFromUN.status_code == 201: 
+					newresponseFromFrog = requests.put(graph_url, data=nffg.getJSON(), headers=headers)
+					LOG.debug("Status code received from the frog4 orchestrator: %s",newresponseFromFrog.status_code)
+					if newresponseFromFrog.status_code == 202: 
 						LOG.info("New VNFs and flows properly deployed on the universal node")
 					else:
-						LOG.error("Something went wrong while deploying the new VNFs and flows on the universal node")	
+						LOG.error("Something went wrong while deploying the new VNFs and flows on Frog4 orchestrator")	
 						raise ServerError("Something went wrong while deploying the new VNFs and flows on the universal node")
 				else:
 					LOG.error("Something went wrong while deploying the new VNFs and flows on the universal node")	
 					raise ServerError("Something went wrong while deploying the new VNFs and flows on the universal node")
 				
 	except (requests.ConnectionError):
-		LOG.error("Cannot contact the universal node orchestrator at '%s'",graph_url % (nffg.id))
-		raise ServerError("Cannot contact the universal node orchestrator at "+graph_url)
+		LOG.error("Cannot contact the Frog4 orchestrator at '%s'",graph_url + nffg.id)
+		raise ServerError("Cannot contact the Frog4 orchestrator at "+graph_url)
 
 def getToken():
 	global token, headers
@@ -1537,7 +1538,7 @@ token = None
 headers = {}
 
 # if debug_mode is True no interactions will be made with the UN
-debug_mode = True
+debug_mode = False
 
 if not virtualizerInit():
 	LOG.error("Failed to start up the virtualizer.")
