@@ -259,7 +259,7 @@ def extractVNFsInstantiated(content):
 	'''
 	Parses the message and extracts the type of the deployed network functions.
 	
-	As far as I understand, the 'type' in a NF is the linker between <NF_instances>
+	As far as I understand, the 'name' in a NF is the linker between <NF_instances>
 	and <capabilities><supported_NFs>. Then, this function also checks that the type
 	of the NF to be instantiated is among those to be supported by the universal node
 	'''
@@ -315,7 +315,7 @@ def extractVNFsInstantiated(content):
 			LOG.error("Unsupported operation for vnf: " + instance.id.get_value())
 			raise ClientError("Unsupported operation for vnf: "+instance.id.get_value())
 		graph_id=instance.id.get_value()	
-		vnfType = instance.type.get_value()
+		vnfType = instance.name.get_value()
 		if vnfType not in supportedTypes:
 			LOG.error("VNF of type '%s' is not supported by the UN!",vnfType)
 			raise ClientError("VNF of type "+ vnfType +" is not supported by the UN!")
@@ -327,6 +327,8 @@ def extractVNFsInstantiated(content):
 			
 		foundTypes.append(vnfType)
 		port_list = []
+		#Append the first port dedicated to management vlan	
+		port_list.append(Port(_id="port:"+str(0)))
 		unify_control = []
 		unify_env_variables = []
 		for port_id in instance.ports.port:
@@ -403,7 +405,6 @@ def extractVNFsInstantiated(content):
 					raise ClientError("Unsupported metadata " + key)
 		if instance.resources.cpu.data is not None or instance.resources.mem.data is not None or instance.resources.storage.data is not None:
 			LOG.warning("Resources are not supported inside a node element! Node: "+ instance.id.get_value())
-
 		#the name of vnf must correspond to the type in supported_NFs	
 		vnf = VNF(_id = instance.id.get_value(), name = vnfType,vnf_template_location=vnfType, ports=port_list, unify_control=unify_control, unify_env_variables=unify_env_variables)
 		nfinstances.append(vnf)
@@ -437,22 +438,26 @@ def extractRules(content):
 	infrastructure = Virtualizer.parse(root=tree.getroot())
 	universal_node = infrastructure.nodes.node[constants.NODE_ID]
 	flowtable = universal_node.flowtable
-
+	instances = universal_node.NF_instances
+	for instance in instances :
+		first_id = instance.id.get_value()
+	
 
 	endpoints_dict = {}
 	#Add the endpoint for the managment interface. This is a vlan type endpoint and the vlan id must correspond to the management vlan 
 	#assigned to the area where the Openstack of the jolnet deploy the vnf
-	endpoints_dict["mgmt"] = EndPoint(_id="mgmt", _type="vlan",vlan_id="ti-mgmt", interface="eth0", name="management")
+	
+	endpoints_dict["mgmt"] = EndPoint(_id="mgmt", _type="vlan",vlan_id="tn-mgmt", interface="eth0", name="management")
 
 	flowrules = []
-	'''
+	
 	#Add the rules for the management endpoint
 	tmp_flowrule1 = FlowRule()
 	tmp_flowrule1.id = "M1A"
 	tmp_flowrule1.priority = 10
 	tmp_match = Match()
 	tmp_match.port_in = "endpoint:" + "mgmt"
-	tmp_action=Action(output = "vnf:1:port:" + "0")
+	tmp_action=Action(output = "vnf:" +first_id + ":port:" + "0")
 	tmp_flowrule1.match = tmp_match;
 	tmp_flowrule1.actions.append(tmp_action)
 	flowrules.append(tmp_flowrule1)
@@ -461,12 +466,12 @@ def extractRules(content):
 	tmp_flowrule2.id = "M1B"
 	tmp_flowrule2.priority = 10
 	tmp_match = Match()
-	tmp_match.port_in = "vnf:1:port:" + "0"
+	tmp_match.port_in = "vnf:" + first_id +":port:" + "0"
 	tmp_action=Action(output = "endpoint:" + "mgmt")
 	tmp_flowrule2.match = tmp_match;
 	tmp_flowrule2.actions.append(tmp_action)
 	flowrules.append(tmp_flowrule2)
-	'''
+	
 	#TODO: IDvlan now is forced to an initial value of 270, it will be dinamically get from the EscapeNffg in the next release 
 	IDvlan= 270
 	for flowentry in flowtable:		
@@ -537,13 +542,13 @@ def extractRules(content):
 			port_name = physicalPortsVirtualization[port.name.get_value()]
 			port_id = findEndPointId(universal_node, port.name.get_value())
 			LOG.debug("port name: %s", port.name.get_value())
-			tokens= port.name.get_value().split('/')
-                        LOG.debug("node: %s", tokens[0])
-                        LOG.debug("interface: %s", tokens[1])
-			node_t = tokens[0]
-			interface_t = tokens[1]
-			#check the node id to understand the correct domain where the endpoint will be deployed
-			if 'of' in port.name.get_value():
+                        if 'of' in port.name.get_value():
+				tokens= port.name.get_value().split('/')
+	                        LOG.debug("node: %s", tokens[0])
+        	                LOG.debug("interface: %s", tokens[1])
+				node_t = tokens[0]
+				interface_t = tokens[1]
+				#check the node id to understand the correct domain where the endpoint will be deployed
 				if port_name not in endpoints_dict:
 					LOG.debug("It's an onos_domain endpoint")
 					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=interface_t,
@@ -552,8 +557,8 @@ def extractRules(content):
 					LOG.debug("%s", str(endpoints_dict[port_name]))
 			else:
                                 if port_name not in endpoints_dict:
-					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=interface_t,
-                                                                                                         name=port.name.get_value(), node_id=node_t)
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=str(port_id),
+                                                                                                         name=port.name.get_value())
 					IDvlan+=1
 			match.port_in = "endpoint:" + endpoints_dict[port_name].id
 		elif tokens[4] == 'NF_instances':
@@ -608,12 +613,12 @@ def extractRules(content):
 			port_name = physicalPortsVirtualization[port.name.get_value()]
 			port_id = findEndPointId(universal_node, port.name.get_value())
 			LOG.debug("port name: %s", port.name.get_value())
-                        tokens= port.name.get_value().split('/')
-                        LOG.debug("node: %s", tokens[0])
-                        LOG.debug("interface: %s", tokens[1])
-                        node_t = tokens[0]
-                        interface_t = tokens[1]
-			if 'of' in port.name.get_value():
+                        if 'of' in port.name.get_value():
+				tokens= port.name.get_value().split('/')
+	                        LOG.debug("node: %s", tokens[0])
+        	                LOG.debug("interface: %s", tokens[1])
+                	        node_t = tokens[0]
+                	        interface_t = tokens[1]
                                 if port_name not in endpoints_dict:
                                         LOG.debug("It's an onos_domain endpoint")
 
@@ -622,8 +627,8 @@ def extractRules(content):
                                         LOG.debug(endpoints_dict[port_name].getDict(domain=True))
                         else:
                                 if port_name not in endpoints_dict:
-                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=interface_t,
-                                                                                                         name=port.name.get_value(), node_id=node_t)
+                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=str(port_id),
+                                                                                                         name=port.name.get_value())
                                         IDvlan+=1
 
 			flowrule.actions.append(Action(output = "endpoint:" + endpoints_dict[port_name].id))
@@ -1033,7 +1038,7 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 	graph_url = unOrchestratorURL + "/NF-FG/"
 
 	try:
-		if len(nffg.flow_rules) + len(nffg.vnfs) + len(nffg.end_points) == 0:
+		if len(nffg.flow_rules) - 2 + len(nffg.vnfs) + len(nffg.end_points) <= 1:
 			LOG.debug("No elements have to be sent to Frog4 orchestrator...sending a delete request")
 			LOG.debug("DELETE url: %s %s", graph_url, nffg.id)
 			if debug_mode is False:
