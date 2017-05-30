@@ -100,7 +100,8 @@ class DoEditConfig:
 			LOG.info("Executing the 'edit-config' command")
 			# check if this request comes from Escape
 			content = req.stream.read()
-			
+			LOG.debug("Request coming from Mdo: ")	
+			LOG.debug("%s", content)
 			content = adjustEscapeNffg(content)
 			#content = req.stream.read()
 			#content = req
@@ -264,7 +265,7 @@ def extractVNFsInstantiated(content):
 	of the NF to be instantiated is among those to be supported by the universal node
 	'''
 	
-	global graph_id, tcp_port, unify_port_mapping, unify_monitoring
+	global graph_id, tcp_port, unify_port_mapping, unify_monitoring, endpoint_vlanid
 	
 	try:
 		tree = ET.parse(constants.GRAPH_XML_FILE)
@@ -389,7 +390,9 @@ def extractVNFsInstantiated(content):
 			if port.control.orchestrator.get_as_text() is not None:
 				unify_env_variables.append("CFOR="+port.control.orchestrator.get_as_text())
 			if port.metadata.length() > 0:
-				LOG.error("Metadata are not supported inside a port element. Those should specified per node")
+				#LOG.error("Metadata are not supported inside a port element. Those should specified per node")
+				vlan_id = port.metadata['vlanid'].value.get_as_text()
+				endpoint_vlanid.append(vlan_id)
 		if instance.metadata.length() > 0:
 			for metadata_id in instance.metadata:
 				metadata = instance.metadata[metadata_id]
@@ -442,7 +445,7 @@ def extractRules(content):
 	for instance in instances :
 		first_id = instance.id.get_value()
 	
-
+	endpoint_vlanid.reverse() #contain all vlan id to set in endpoint vlan id, it pop from the last element, so i reverse to get element in order
 	endpoints_dict = {}
 	#Add the endpoint for the managment interface. This is a vlan type endpoint and the vlan id must correspond to the management vlan 
 	#assigned to the area where the Openstack of the jolnet deploy the vnf
@@ -472,8 +475,6 @@ def extractRules(content):
 	tmp_flowrule2.actions.append(tmp_action)
 	flowrules.append(tmp_flowrule2)
 	
-	#TODO: IDvlan now is forced to an initial value of 270, it will be dinamically get from the EscapeNffg in the next release 
-	IDvlan= 270
 	for flowentry in flowtable:		
 
 		if flowentry.get_operation() is None:
@@ -551,15 +552,11 @@ def extractRules(content):
 				#check the node id to understand the correct domain where the endpoint will be deployed
 				if port_name not in endpoints_dict:
 					LOG.debug("It's an onos_domain endpoint")
-					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=interface_t,
-													 name=port.name.get_value(), node_id=node_t, domain='onos_domain')
-					IDvlan+=1
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain='onos_domain')
 					LOG.debug("%s", str(endpoints_dict[port_name]))
 			else:
                                 if port_name not in endpoints_dict:
-					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=str(port_id),
-                                                                                                         name=port.name.get_value())
-					IDvlan+=1
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
 			match.port_in = "endpoint:" + endpoints_dict[port_name].id
 		elif tokens[4] == 'NF_instances':
 			#This is a port of the NF. I have to extract the port ID and the type of the NF.
@@ -622,14 +619,11 @@ def extractRules(content):
                                 if port_name not in endpoints_dict:
                                         LOG.debug("It's an onos_domain endpoint")
 
-                                        endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain='onos_domain', _type="vlan",vlan_id=str(IDvlan), interface=interface_t, name=port.name.get_value(), node_id=node_t)
-                                        IDvlan+=1
+                                        endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain='onos_domain', _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t, name=port.name.get_value(), node_id=node_t)
                                         LOG.debug(endpoints_dict[port_name].getDict(domain=True))
                         else:
                                 if port_name not in endpoints_dict:
-                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(IDvlan), interface=str(port_id),
-                                                                                                         name=port.name.get_value())
-                                        IDvlan+=1
+                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
 
 			flowrule.actions.append(Action(output = "endpoint:" + endpoints_dict[port_name].id))
 		elif tokens[4] == 'NF_instances':
@@ -1541,9 +1535,10 @@ password = ""
 tenant =""
 token = None
 headers = {}
+endpoint_vlanid = []
 
 # if debug_mode is True no interactions will be made with the UN
-debug_mode = False
+debug_mode = True
 
 if not virtualizerInit():
 	LOG.error("Failed to start up the virtualizer.")
