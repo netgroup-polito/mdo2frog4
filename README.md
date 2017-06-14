@@ -36,6 +36,8 @@ In the following we list the steps required on an **Ubuntu 14.04**.
 
 The Virtualizer reads its configuration from the file [./config/configuration.ini](config/configuration.ini), 
 which must be properly edited before starting the Virtualizer itself.
+The file template.xml must be setted with all the vm templates that the virtualizer will deploy.
+The file .info.xml must be setted with all the port setted in the [./config/universal-node-example.xml].
 
 ## How to run the Virtualizer
 
