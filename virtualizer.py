@@ -95,7 +95,7 @@ class DoEditConfig:
 		'''
 		Edit the configuration of the node
 		'''
-		global unify_monitoring
+		global unify_monitoring, fakevm
 		try:
 			LOG.info("Executing the 'edit-config' command")
 			# check if this request comes from Escape
@@ -105,9 +105,9 @@ class DoEditConfig:
 			content = adjustEscapeNffg(content)
 			#content = req.stream.read()
 			#content = req
-		 	LOG.debug("Body of the request after adjust:")
-                        LOG.debug("%s",content)	
-			checkCorrectness(content)
+			LOG.debug("Body of the request after adjust:")
+			LOG.debug("%s",content)	
+			#checkCorrectness(content)
 			LOG.debug("Body of the request adter check:")
 			LOG.debug("%s",content)
 			
@@ -130,7 +130,9 @@ class DoEditConfig:
 			#
 			# Interact with the universal node orchestrator in order to implement the required commands
 			#
-			
+			if fakevm is True:
+				fakevm = False
+				rulesToBeAdded = connectEndpoints(rulesToBeAdded)	
 			sendToUniversalNode(rulesToBeAdded,vnfsToBeAdded, endpoints)	#Sends the new VNFs and flow rules to the universal node orchestrator
 		
 			# 
@@ -265,7 +267,7 @@ def extractVNFsInstantiated(content):
 	of the NF to be instantiated is among those to be supported by the universal node
 	'''
 	
-	global graph_id, tcp_port, unify_port_mapping, unify_monitoring, endpoint_vlanid
+	global graph_id, tcp_port, unify_port_mapping, unify_monitoring, endpoint_vlanid, fakevm
 	
 	try:
 		tree = ET.parse(constants.GRAPH_XML_FILE)
@@ -317,9 +319,9 @@ def extractVNFsInstantiated(content):
 			raise ClientError("Unsupported operation for vnf: "+instance.id.get_value())
 		graph_id=instance.id.get_value()	
 		vnfType = instance.name.get_value()
-		if vnfType not in supportedTypes:
-			LOG.error("VNF of type '%s' is not supported by the UN!",vnfType)
-			raise ClientError("VNF of type "+ vnfType +" is not supported by the UN!")
+		#if vnfType not in supportedTypes:
+		#	LOG.error("VNF of type '%s' is not supported by the UN!",vnfType)
+		#	raise ClientError("VNF of type "+ vnfType +" is not supported by the UN!")
 		
 		if vnfType in foundTypes:
 			LOG.error("Found multiple NF instances with the same type '%s'!",vnfType)
@@ -409,8 +411,11 @@ def extractVNFsInstantiated(content):
 		if instance.resources.cpu.data is not None or instance.resources.mem.data is not None or instance.resources.storage.data is not None:
 			LOG.warning("Resources are not supported inside a node element! Node: "+ instance.id.get_value())
 		#the name of vnf must correspond to the type in supported_NFs	
-		vnf = VNF(_id = instance.id.get_value(), name = vnfType,vnf_template_location=vnfType, ports=port_list, unify_control=unify_control, unify_env_variables=unify_env_variables)
-		nfinstances.append(vnf)
+		if vnfType != "fake":
+			vnf = VNF(_id = instance.id.get_value(), name = vnfType,vnf_template_location=vnfType, ports=port_list, unify_control=unify_control, unify_env_variables=unify_env_variables)
+			nfinstances.append(vnf)
+		else:
+			fakevm = True
 		LOG.debug("Required VNF: '%s'",vnfType)
 		
 	return nfinstances
@@ -543,10 +548,10 @@ def extractRules(content):
 			port_name = physicalPortsVirtualization[port.name.get_value()]
 			port_id = findEndPointId(universal_node, port.name.get_value())
 			LOG.debug("port name: %s", port.name.get_value())
-                        if 'of' in port.name.get_value():
+			if 'of' in port.name.get_value():
 				tokens= port.name.get_value().split('/')
-	                        LOG.debug("node: %s", tokens[0])
-        	                LOG.debug("interface: %s", tokens[1])
+				LOG.debug("node: %s", tokens[0])
+				LOG.debug("interface: %s", tokens[1])
 				node_t = tokens[0]
 				interface_t = tokens[1]
 				#check the node id to understand the correct domain where the endpoint will be deployed
@@ -556,7 +561,7 @@ def extractRules(content):
 					LOG.debug("%s", str(endpoints_dict[port_name]))
 			else:
                                 if port_name not in endpoints_dict:
-					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), domain='openstack', _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
 			match.port_in = "endpoint:" + endpoints_dict[port_name].id
 		elif tokens[4] == 'NF_instances':
 			#This is a port of the NF. I have to extract the port ID and the type of the NF.
@@ -623,7 +628,7 @@ def extractRules(content):
                                         LOG.debug(endpoints_dict[port_name].getDict(domain=True))
                         else:
                                 if port_name not in endpoints_dict:
-                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
+                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain='openstack', _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
 
 			flowrule.actions.append(Action(output = "endpoint:" + endpoints_dict[port_name].id))
 		elif tokens[4] == 'NF_instances':
@@ -1013,7 +1018,8 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 	'''
 	Deploys rules and VNFs on the universal node
 	'''
-	LOG.info("Sending the new configuration to the universal node orchestrator (%s)",unOrchestratorURL)
+	LOG.info("Sending the new configuration to the frog4 orchestrator (%s)",unOrchestratorURL)
+	global corr_graphids
 
 	nffg = NF_FG()
 	nffg.id = graph_id
@@ -1063,13 +1069,19 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 			LOG.debug("POST url: "+ graph_url)
 			
 			if debug_mode is False:
+				
 				if authentication is True and token is None:
-					getToken()	
+					getToken()
+					
 				responseFromFrog = requests.put(graph_url, data=nffg.getJSON(domain=True), headers=headers)
 				LOG.debug("Status code received from the frog4 orchestrator: %s",responseFromFrog.status_code)
 			
 				if responseFromFrog.status_code == 202:
 					LOG.info("New VNFs and flows properly deployed")
+					received_id = responseFromFrog.text
+					LOG.info("Graph_id = %s  Received graph_id = %s",graph_id, received_id)
+					corr_graphids[graph_id] = received_id
+					LOG.info("Correspondance : %s -- %s", graph_id, corr_graphids[graph_id])
 				elif responseFromFrog.status_code == 401:
 					LOG.debug("Token expired, getting a new one...")
 					getToken()
@@ -1419,6 +1431,7 @@ def adjustEscapeNffg(content):
 	#tmp.xml is the adjusted nffg coming from escape
 	#txt.xml is the incoming nffg from escape
 	#info.xml contain the information to add to escape nffg
+	global endpoint_vlanid
         LOG.debug("Adjusting the Escape Nffg")
 	with open("txt.xml", "w") as text_file:
 		text_file.write("%s" % content)
@@ -1450,6 +1463,21 @@ def adjustEscapeNffg(content):
 	for flowentry in flowtable:
 		if flowentry.get_operation() != "delete" and flowentry.get_operation() != "create":
 			flowtable.remove(flowentry)
+	"""
+	#Endpoint_vlanid handled in flowtable
+	for flowentry in flowtable:
+                if flowentry.action is not None:
+                        if type(flowentry.action.get_value()) is str:
+                                actions = re.split(',| ', flowentry.action.data)
+                                for a in actions:
+                                        tokens = a.split(":")
+                                        if tokens[0] == "push_tag":
+                                                        vlan_id = tokens[1]
+                                                        splitted_vlan_id = vlan_id.split('x')
+                                                        vlan_id= splitted_vlan_id[1]
+                                                        LOG.debug("Vlan_id:" + vlan_id)
+                                                        endpoint_vlanid.append(str(vlan_id))
+	"""
 	for flowentry in flowtable:
 		if flowentry.action is not None:
 			flowentry.action = None
@@ -1467,7 +1495,7 @@ def adjustEscapeNffg(content):
                                         if not supportedMatch(tokens[0]):
                                         	raise ClientError("Not supported match")
                                         if tokens[0] == "dl_tag" or tokens[0] == "push_tag" or tokens[0] == "pop_tag":
-                                        	LOG.debug("Match deleted")
+						LOG.debug("Match deleted")
                                         else:
 						if adjusted_matches == "":
 							adjusted_matches = adjusted_matches +  m
@@ -1501,6 +1529,28 @@ def loadTemplates():
 	os.remove(constants.GRAPH_XML_FILE)
 	os.rename("tmp", constants.GRAPH_XML_FILE)
 
+def connectEndpoints(flowrules):
+	newFlowRules=[]
+	endpoints=[]
+	for rule in flowrules:
+		if not rule.id.startswith("M"):
+			if rule.match.port_in.startswith("endpoint"):
+				endpoints.append(rule.match.port_in)
+	for rule in flowrules:
+		if not rule.id.startswith("M"):
+			if rule.match.port_in.startswith("endpoint"):
+				for endpoint in endpoints:
+					if endpoint != rule.match.port_in:
+							newAction = Action(output = endpoint)
+							LOG.debug( endpoint)
+							rule.actions = []
+							rule.actions.append(newAction)
+							newFlowRules.append(rule)
+	LOG.debug("New rules generated:")
+	for rule in newFlowRules:
+		LOG.debug(rule.getDict())
+	return newFlowRules
+			
 '''
 	The following code is executed by guicorn at the boot of the virtualizer
 '''
@@ -1536,7 +1586,8 @@ tenant =""
 token = None
 headers = {}
 endpoint_vlanid = []
-
+corr_graphids = {}
+fakevm = False
 # if debug_mode is True no interactions will be made with the UN
 debug_mode = True
 

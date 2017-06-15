@@ -11,7 +11,7 @@
 				<port>
 					<id>1</id>
 					<name>of:000064e9505a82c0/5100</name>
-					<port_type>port-abstract</port_type>
+					<port_type>port-sap</port_type>
 					<sap>sap1</sap>
 				</port>
 				<port>
@@ -20,31 +20,18 @@
 					<port_type>port-sap</port_type>
 					<sap>sap2</sap>
 				</port>
+				<port>
+					<id>3</id>
+					<name>External_port_3</name>
+					<port_type>port-sap</port_type>
+					<sap>sap3</sap>
+				</port>
 			</ports>
 			<resources>
-				<cpu>10</cpu>
+				<cpu>12</cpu>
 				<mem>32 GB</mem>
-				<storage>5 TB</storage>
+				<storage>15 TB</storage>
 			</resources>
-			<NF_instances>
-				<node>
-					<id>2</id>
-					<name>user</name>
-					<type>cirros</type>
-					<ports>
-						<port>
-							<id>1</id>
-							<name>ovs1_eth0</name>
-							<port_type>port-abstract</port_type>
-						</port>
-					</ports>
-					<resources>
-						<cpu>1.0</cpu>
-						<mem>1.0</mem>
-						<storage>0.0</storage>
-					</resources>
-				</node>
-			</NF_instances>
 			<capabilities>
 				<supported_NFs>
 					<node>
@@ -62,31 +49,59 @@
 								<name>VNF port 2</name>
 								<port_type>port-sap</port_type>
 							</port>
+							<port>
+								<id>3</id>
+								<name>VNF port 3</name>
+								<port_type>port-sap</port_type>
+							</port>
+						</ports>
+					</node>
+					<node>
+						<id>mca-fw1</id>
+						<name>firewall_user_1</name>
+						<type>mca-fw1</type>
+						<ports>
+							<port>
+								<id>1</id>
+								<name>VNF port 1</name>
+								<port_type>port-sap</port_type>
+							</port>
+							<port>
+								<id>2</id>
+								<name>VNF port 2</name>
+								<port_type>port-sap</port_type>
+							</port>
+							<port>
+								<id>3</id>
+								<name>VNF port 3</name>
+								<port_type>port-sap</port_type>
+							</port>
+						</ports>
+					</node>
+					<node>
+						<id>mca-fw2</id>
+						<name>firewall_user_2</name>
+						<type>mca-fw2</type>
+						<ports>
+							<port>
+								<id>1</id>
+								<name>VNF port 1</name>
+								<port_type>port-sap</port_type>
+							</port>
+							<port>
+								<id>2</id>
+								<name>VNF port 2</name>
+								<port_type>port-sap</port_type>
+							</port>
+							<port>
+								<id>3</id>
+								<name>VNF port 3</name>
+								<port_type>port-sap</port_type>
+							</port>
 						</ports>
 					</node>
 				</supported_NFs>
 			</capabilities>
-			<flowtable>
-				<flowentry>
-					<id>21</id>
-					<priority>100</priority>
-					<port>../../../NF_instances/node[id=2]/ports/port[id=1]</port>
-					<out>../../../ports/port[id=1]</out>
-					<resources>
-						<bandwidth>0.0</bandwidth>
-					</resources>
-				</flowentry>
-				<flowentry>
-					<id>22</id>
-					<priority>100</priority>
-					<port>../../../ports/port[id=1]</port>
-					<match>ether_type=0x806,dest_mac=00:00:00:00:00:01</match>
-					<out>../../../NF_instances/node[id=2]/ports/port[id=1]</out>
-					<resources>
-						<bandwidth>0.0</bandwidth>
-					</resources>
-				</flowentry>
-			</flowtable>
 		</node>
 	</nodes>
 	<version>2016-02-24; compiled at 2016-03-18  19:56:13</version>

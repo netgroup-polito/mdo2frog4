@@ -10,6 +10,6 @@
 					<id>2</id>
 					<name>External_port_2</name>
 					<port_type>port-sap</port_type>
-					<sap>sap2</sap>
+					<sap>sap3</sap>
 				</port>
 			</ports>
