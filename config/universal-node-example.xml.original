@@ -5,10 +5,10 @@
 
 	<ports>
 		<port name="eth1">
-			<virtualized as="of:000064e9505a8a40/5110" port-type="port-sap" sap="sap1"/>
+			<virtualized as="of:000064e9505a82c0/5100" port-type="port-sap" sap="sap1"/>
 		</port>
 		<port name="eth2">
-			<virtualized as="of:000064e9505a7f18/5098" port-type="port-sap" sap="sap2"/>
+			<virtualized as="External_port_2" port-type="port-sap" sap="sap2"/>
 		</port>
                 <port name="eth3">
                         <virtualized as="External_port_3" port-type="port-sap" sap="sap3"/>

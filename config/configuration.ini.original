@@ -1,5 +1,5 @@
 [connections]
-Frog4OrchestratorAddress: 130.192.225.99
+Frog4OrchestratorAddress: 130.192.225.95
 Frog4OrchestratorPort: 9000
 
 [configuration]
@@ -11,11 +11,12 @@ PortFile: ./config/universal-node-example.xml
 # Valid values for LogLevel: critical, error, warning, info, debug
 LogLevel: debug
 
+# To interact with FROG4 authentication must set to false but username, password and tenant must be setted
 [orchestrator authentication]
 
 authentication = true
-username = admin
-password = admin
+username = flubrano
+password = j0ln3tMCA!
 tenant = MCA
 
 [resources]

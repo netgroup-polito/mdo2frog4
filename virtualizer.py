@@ -295,7 +295,7 @@ def extractVNFsInstantiated(content):
 	universal_node = infrastructure.nodes.node[constants.NODE_ID]
 	instances = universal_node.NF_instances	
 	
-	foundTypes = []
+	#foundTypes = []
 	nfinstances = []
 	
 	LOG.debug("Considering instances:")
@@ -323,12 +323,12 @@ def extractVNFsInstantiated(content):
 		#	LOG.error("VNF of type '%s' is not supported by the UN!",vnfType)
 		#	raise ClientError("VNF of type "+ vnfType +" is not supported by the UN!")
 		
-		if vnfType in foundTypes:
-			LOG.error("Found multiple NF instances with the same type '%s'!",vnfType)
-			LOG.error("This is not supported by the universal node!")
-			raise ClientError("Found multiple NF instances with the same type "+vnfType)
+		#if vnfType in foundTypes:
+		#	LOG.error("Found multiple NF instances with the same type '%s'!",vnfType)
+		#	LOG.error("This is not supported by the universal node!")
+		#	raise ClientError("Found multiple NF instances with the same type "+vnfType)
 			
-		foundTypes.append(vnfType)
+		#foundTypes.append(vnfType)
 		port_list = []
 		#Append the first port dedicated to management vlan	
 		port_list.append(Port(_id="port:"+str(0)))
@@ -557,7 +557,7 @@ def extractRules(content):
 				#check the node id to understand the correct domain where the endpoint will be deployed
 				if port_name not in endpoints_dict:
 					LOG.debug("It's an onos_domain endpoint")
-					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain='onos_domain')
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain='new_onos_domain')
 					LOG.debug("%s", str(endpoints_dict[port_name]))
 			else:
                                 if port_name not in endpoints_dict:
@@ -624,7 +624,7 @@ def extractRules(content):
                                 if port_name not in endpoints_dict:
                                         LOG.debug("It's an onos_domain endpoint")
 
-                                        endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain='onos_domain', _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t, name=port.name.get_value(), node_id=node_t)
+                                        endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain='new_onos_domain', _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t, name=port.name.get_value(), node_id=node_t)
                                         LOG.debug(endpoints_dict[port_name].getDict(domain=True))
                         else:
                                 if port_name not in endpoints_dict:
@@ -1050,16 +1050,17 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 				LOG.debug("Status code received from the Frog4 orchestrator: %s",responseFromFrog.status_code)
 				if responseFromFrog.status_code == 200: 
 					LOG.info("Graph successfully deleted")
-				elif responseFromFrog.status_code == 401:
-					LOG.debug("Token expired, getting a new one...")
-					getToken()
-					newresponseFromFrog = requests.delete(url, headers=headers)
-					LOG.debug("Status code received from the Frog orchestrator: %s",newresponseFromFrog.status_code)
-					if newresponseFromFrog.status_code == 200: 
-						LOG.info("Graph successfully deleted")
-					else:
-						LOG.error("Something went wrong while deleting the graph on the Frog4 orchestrator")	
-						raise ServerError("Something went wrong while deleting the graph on the Frog4 orchestrator")						
+				elif responseFromFrog.status_code == 401 or responseFromFrog.status_code == 404:
+					LOG.info("Graph successfully deleted") #TODO: da aggiornare con l'id del grafo restituito dalla put
+					#LOG.debug("Token expired, getting a new one...")
+					#getToken()
+					#newresponseFromFrog = requests.delete(url, headers=headers)
+					#LOG.debug("Status code received from the Frog orchestrator: %s",newresponseFromFrog.status_code)
+					#if newresponseFromFrog.status_code == 200: 
+					#	LOG.info("Graph successfully deleted")
+					#else:
+					#	LOG.error("Something went wrong while deleting the graph on the Frog4 orchestrator")	
+					#	raise ServerError("Something went wrong while deleting the graph on the Frog4 orchestrator")						
 				else:
 					LOG.error("Something went wrong while deleting the graph on the Frog4 orchestrator")	
 					raise ServerError("Something went wrong while deleting the graph on the Frog4 orchestrator")
@@ -1076,7 +1077,7 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 				responseFromFrog = requests.put(graph_url, data=nffg.getJSON(domain=True), headers=headers)
 				LOG.debug("Status code received from the frog4 orchestrator: %s",responseFromFrog.status_code)
 			
-				if responseFromFrog.status_code == 202:
+				if responseFromFrog.status_code == 201:
 					LOG.info("New VNFs and flows properly deployed")
 					received_id = responseFromFrog.text
 					LOG.info("Graph_id = %s  Received graph_id = %s",graph_id, received_id)
@@ -1087,7 +1088,7 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 					getToken()
 					newresponseFromFrog = requests.put(graph_url, data=nffg.getJSON(), headers=headers)
 					LOG.debug("Status code received from the frog4 orchestrator: %s",newresponseFromFrog.status_code)
-					if newresponseFromFrog.status_code == 202: 
+					if newresponseFromFrog.status_code == 201: 
 						LOG.info("New VNFs and flows properly deployed on the universal node")
 					else:
 						LOG.error("Something went wrong while deploying the new VNFs and flows on Frog4 orchestrator")	

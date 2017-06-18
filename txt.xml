@@ -4,49 +4,25 @@
 		<node>
 			<id>UUID11</id>
 			<NF_instances>
-
-				<node operation="create">
+				<node operation="delete">
 					<id>2</id>
-					<name>user</name>
-					<type>cirros</type>
-					<ports>
-						<port>
-							<id>1</id>
-							<name>ovs1_eth0</name>
-							<port_type>port-abstract</port_type>
-						</port>
-					</ports>
-					<resources>
-						<cpu>1.0</cpu>
-						<mem>1.0</mem>
-						<storage>0.0</storage>
-					</resources>
 				</node>
 			</NF_instances>
 			<flowtable>
-				<flowentry operation="create">
+				<flowentry operation="delete">
 					<id>21</id>
-					<priority>100</priority>
-					<port>../../../NF_instances/node[id=2]/ports/port[id=1]</port>
-					<action>push_tag:0x0001</action>
-					<out>../../../ports/port[id=1]</out>
-					<resources>
-						<bandwidth>0.0</bandwidth>
-					</resources>
 				</flowentry>
-				<flowentry operation="create">
+				<flowentry operation="delete">
 					<id>22</id>
-					<priority>100</priority>
-					<port>../../../ports/port[id=1]</port>
-					<match>ether_type=0x806,dest_mac=00:00:00:00:00:01;dl_tag=0x0002</match>
-					<out>../../../NF_instances/node[id=2]/ports/port[id=1]</out>
-					<resources>
-						<bandwidth>0.0</bandwidth>
-					</resources>
+				</flowentry>
+				<flowentry operation="delete">
+					<id>23</id>
+				</flowentry>
+				<flowentry operation="delete">
+					<id>24</id>
 				</flowentry>
 			</flowtable>
-                </node>
-        </nodes>
-		
-        <version>2016-02-24; compiled at 2016-03-18  19:56:13</version>
-		</virtualizer>
+		</node>
+	</nodes>
+	<version>2016-02-24; compiled at 2016-03-18  19:56:13</version>
+</virtualizer>
