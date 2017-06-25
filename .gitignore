@@ -1,0 +1,5 @@
+*.pyc
+.env
+virtualizer_original.py
+virtualizer.py.ok
+virtualizer.log

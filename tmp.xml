@@ -1,5 +1,7 @@
 <?xml version="1.0" ?>
 <virtualizer>
+		<id>UUID001</id>
+	<name>Single node</name>
 	<nodes>
 		<node>
 			<id>UUID11</id>
@@ -20,22 +22,49 @@
 				</port>
 			</ports>
 			<NF_instances>
-				<node operation="delete">
-					<id>2</id>
+				<node operation="create">
+					<id>1</id>
+					<name>auth</name>
+					<type>cirros</type>
+					<ports>
+						<port>
+							<id>1</id>
+							<name>ovs1_eth0</name>
+							<port_type>port-abstract</port_type>
+							<metadata>
+						<key>vlanid</key>
+						<value>10</value>
+					</metadata>
+						</port>
+					</ports>
+					<resources>
+						<cpu>1.0</cpu>
+						<mem>1.0</mem>
+						<storage>0.0</storage>
+					</resources>
 				</node>
 			</NF_instances>
 			<flowtable>
-				<flowentry operation="delete">
-					<id>21</id>
+				<flowentry operation="create">
+					<id>11</id>
+					<priority>100</priority>
+					<port>../../../NF_instances/node[id=1]/ports/port[id=1]</port>
+					<action>push_tag:0x0001</action>
+					<out>../../../ports/port[id=1]</out>
+					<resources>
+						<bandwidth>0.0</bandwidth>
+					</resources>
 				</flowentry>
-				<flowentry operation="delete">
-					<id>22</id>
-				</flowentry>
-				<flowentry operation="delete">
-					<id>23</id>
-				</flowentry>
-				<flowentry operation="delete">
-					<id>24</id>
+				<flowentry operation="create">
+					<id>12</id>
+					<priority>100</priority>
+					<port>../../../ports/port[id=1]</port>
+					<match>dl_tag=0x0002</match>
+					<action>pop_tag</action>
+					<out>../../../NF_instances/node[id=1]/ports/port[id=1]</out>
+					<resources>
+						<bandwidth>0.0</bandwidth>
+					</resources>
 				</flowentry>
 			</flowtable>
 		</node>
