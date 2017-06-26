@@ -16,7 +16,7 @@ import os
 
 import constants
 from virtualizer_library.virtualizer import ET, Virtualizer,  Software_resource, Infra_node, Port as Virt_Port
-from un_native_nffg_library.nffg import NF_FG, VNF, Match, Action, EndPoint, FlowRule, Port, UnifyControl
+from nffg_library.nffg import NF_FG, VNF, Match, Action, EndPoint, FlowRule, Port, UnifyControl
 
 class DoPing:
 	'''
@@ -885,6 +885,8 @@ def virtualizerInit():
 	The virtualizer maintains the state of the node in a tmp file.
 	This function initializes such a file.
 	'''
+	if not setLog():
+		return False
 
 	LOG.info("Initializing the virtualizer...")
 
@@ -1022,27 +1024,30 @@ def readConfigurationFile():
 	except:
 		LOG.error("Option 'PortFile' not found in section 'configuration' of file '%s'",constants.CONFIGURATION_FILE)
 		return False
+	"""
 	try:
 		LogLevel = config.get("configuration","LogLevel")
 		if LogLevel == 'debug':
-			LOG.setLevel(logging.DEBUG)
-			LOG.addHandler(sh)
+			LOG.debug("Line : - 1028")
+			LOG.setLevel(LOG.DEBUG)
+			#LOG.addHandler(sh)
 			LOG.debug("Log level set to 'debug'")
 		if LogLevel == 'info':
-			LOG.setLevel(logging.INFO)
+			LOG.setLevel(LOG.INFO)
 			LOG.info("Log level set to 'info'")
 		if LogLevel == 'warning':
-			LOG.setLevel(logging.WARNING)
+			LOG.setLevel(LOG.WARNING)
 			LOG.warning("Log level set to 'warning'")
 		if LogLevel == 'error':
-			LOG.setLevel(logging.ERROR)
+			LOG.setLevel(LOG.ERROR)
 			LOG.error("Log level set to 'error'")
 		if LogLevel == 'critical':
-			LOG.setLevel(logging.CRITICAL)
+			LOG.setLevel(LOG.CRITICAL)
 			LOG.critical("Log level set to 'critical'")
 	except:
 		LOG.warning("Option 'LogLevel' not found in section 'configuration' of file '%s'",constants.CONFIGURATION_FILE)
-		LOG.warning("Log level is set on 'INFO'")
+		LOG.warning("Log level is set on 'DEBUG'")
+	"""
 
 	LOG.debug("CPU: %s", cpu)
 	LOG.debug("memory: %s", memory)
@@ -1159,6 +1164,39 @@ def loadTemplates():
 	os.remove(constants.GRAPH_XML_FILE)
 	os.rename("tmp", constants.GRAPH_XML_FILE)
 
+def setLog():
+	config = ConfigParser.ConfigParser()
+	config.read(constants.CONFIGURATION_FILE)
+	sections = config.sections()
+
+	if 'configuration' not in sections:
+		return False
+
+	try:
+		LogFile = config.get("configuration","LogFile")
+	except:
+		return False
+
+	try:
+		LogLevel = config.get("configuration","LogLevel")
+		log_level_tmp = LOG.DEBUG
+		if LogLevel == 'info':
+			log_level_tmp = LOG.INFO
+		if LogLevel == 'warning':
+			log_level_tmp = LOG.WARNING
+		if LogLevel == 'error':
+			log_level_tmp = LOG.ERROR
+		if LogLevel == 'critical':
+			log_level_tmp = LOG.CRITICAL
+	except:
+		return False	
+	
+	log_level = log_level_tmp
+	log_format = '%(asctime)s %(levelname)s %(message)s - %(filename)s'
+	LOG.basicConfig(filename=LogFile, level=log_level, format=log_format, datefmt='%m/%d/%Y %I:%M:%S %p')
+	return True
+
+
 def connectEndpoints(flowrules):
 	newFlowRules=[]
 	endpoints=[]
@@ -1195,9 +1233,9 @@ api = falcon.API()
 #f = logging.Formatter('[%(asctime)s][Virtualizer][%(levelname)s] %(message)s')
 #sh.setFormatter(f)
 #LOG.addHandler(sh)
-log_level = LOG.DEBUG
-log_format = '%(asctime)s %(levelname)s %(message)s - %(filename)s'
-LOG.basicConfig(filename="virtualizer.log", level=log_level, format=log_format, datefmt='%m/%d/%Y %I:%M:%S %p')
+#log_level = LOG.DEBUG
+#log_format = '%(asctime)s %(levelname)s %(message)s - %(filename)s'
+#LOG.basicConfig(filename="virtualizer.log", level=log_level, format=log_format, datefmt='%m/%d/%Y %I:%M:%S %p')
 
 #Global variables
 unOrchestratorURL = "http://"

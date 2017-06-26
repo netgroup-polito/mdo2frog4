@@ -1,0 +1,3 @@
+[submodule "nffg_library"]
+	path = nffg_library
+	url = https://github.com/netgroup-polito/nffg-library.git
