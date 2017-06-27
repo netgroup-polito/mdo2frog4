@@ -1070,7 +1070,7 @@ def adjustEscapeNffg(content):
 		text_file.write("%s" % content)
 
 	with open(".tmp.xml", 'w') as outfile:
-		with open("txt.xml", 'r') as infile_nffg:
+		with open(".txt.xml", 'r') as infile_nffg:
 			rowIter = iter(infile_nffg)
 			for row in rowIter:
 				outfile.write("%s" % row)
