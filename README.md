@@ -1,6 +1,6 @@
-# Virtualizer
+# Mdo2frog4
 
-The Virtualizer is an intermediate module sit between the [https://github.com/netgroup-polito/frog4-orchestrator/]FROG4 
+The Mdo2frog4 is an intermediate module sit between the [https://github.com/netgroup-polito/frog4-orchestrator/]FROG4 
 global orchestrator and the upper layers of the Unify architecture. It operates as follows:
   * receives commands from the upper layers of the Unify architecture based on the virtualizer 
     library defined by WP3;
@@ -10,7 +10,7 @@ global orchestrator and the upper layers of the Unify architecture. It operates 
 
 This module is an adaptation of a old virtualizer module used to integrate the un-orchestrator 
 with the upper layes of the Unify architecture.
-In this case the virtualizer interact through its northbound with the MultiDomain Orchestrator
+In this case the virtualizer(renamed in Mdo2frog4) interact through its northbound with the MultiDomain Orchestrator
 (that is basically Escape) and through its southbound with the FROG4 global orchestrator.
 
 ## Required libraries
@@ -32,12 +32,17 @@ In the following we list the steps required on an **Ubuntu 14.04**.
 	$ sudo apt-get install python-pip
 	$ sudo pip install gunicorn falcon cython requests
 
-## How to configure the Virtualizer
+## How to configure the Mdo2frog4
 
-The Virtualizer reads its configuration from the file [./config/configuration.ini](config/configuration.ini), 
-which must be properly edited before starting the Virtualizer itself.
+The Mdo2frog4 reads its configuration from the file [./config/configuration.ini](config/configuration.ini), 
+which must be properly edited before starting the Mdo2frog4 itself.
+Mdo2frog4 export a abstract vision of the domain managed by the frog4 orchestrator. This abstract vision must be configured before starting the Mdo2frog4 and the MdO.
+In the file template.xml all vm images must be set with correct type and ports. In that way when MdO will get the abstract vision of the domain, will save which vm can be launched
+and how many ports it can have. 
+Every port that the virtualizer must export through its northbound interface, must be set in the file setted as PortFile in the configuration file and in the file 
+[./port_info.xml]port_info.xml. 
 
-## How to run the Virtualizer
+## How to run the Mdo2frog4
 
 	$ gunicorn -b ip:port virtualizer:api
 
@@ -46,7 +51,7 @@ where 'ip' and 'port' must be set to the desired values.
 
 ## Configuration file examples
 
-Examples of configurations that can be sent to the Virtualizer are available in [./config/nffg_examples](nffg_examples).
+Examples of configurations that can be sent to the Mdo2frog4 are available in [./config/nffg_examples](nffg_examples).
 In particular:
   * [./config/nffg_examples/simple_passthrough_nffg.xml](./config/nffg_examples/simple_passthrough_nffg.xml): 
     simple configuration that implements a simple passthrough function, i.e., traffic is 
@@ -65,14 +70,15 @@ In particular:
 
 ## Rest API
 
-The Virtualizer accept commands through its REST interface. The main REST commands 
+The Mdo2frog4 accept commands through its REST interface. The main REST commands 
 to be used to interact with it are detailed in the following.
+The Mdo2frog4 uses the NETCONF protocol
 
-Get information about the Virtualizer
+Get information about the Mdo2frog4
 
     GET /virt/ HTTP/1.1
     
-Test the Virtualizer aliveness
+Test the Mdo2frog4 aliveness
 
     GET /virt/ping HTTP/1.1
 
@@ -80,7 +86,7 @@ Retrieve the current configuration of the universal node
 
     POST /virt/get-config HTTP/1.1
 
-This command returns the current configuration in the format defined by the virtualzier library
+This command returns the current configuration in the format defined by the virtualizer library
 
 Deploy a new configuration 
 
@@ -89,9 +95,9 @@ Deploy a new configuration
 The body of the message must contain the new configuration for the universal node 
 espressed in the format defined by the Virtualizer library.
 
-### Send commands to the Virtualzier
+### Send commands to the Mdo2frog4
     
-In order to interact with the Virtualizer throug its REST API, you can use your favorite REST tool (e.g., some nice 
+In order to interact with the Mdo2frog4 throug its REST API, you can use your favorite REST tool (e.g., some nice 
 plugins for Mozilla Firefox). Just in also use the CURL command line tool, such as in the following example 
 (where the NF-FG to be instantiated is stored in the file 'myGraph.xml'):
 

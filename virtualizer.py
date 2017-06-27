@@ -1060,27 +1060,27 @@ def readConfigurationFile():
 
 def adjustEscapeNffg(content):
 
-	#tmp.xml is the adjusted nffg coming from escape (output)
-	#txt.xml is the incoming nffg from escape (input)
+	#.tmp.xml is the adjusted nffg coming from escape (output)
+	#.txt.xml is the incoming nffg from escape (input)
 	#info.xml contain the information to add to escape nffg (sap)
 
         #global endpoint_vlanid
 	LOG.debug("Adjusting the Escape Nffg")
-	with open("txt.xml", "w") as text_file:
+	with open(".txt.xml", "w") as text_file:
 		text_file.write("%s" % content)
 
-	with open("tmp.xml", 'w') as outfile:
+	with open(".tmp.xml", 'w') as outfile:
 		with open("txt.xml", 'r') as infile_nffg:
 			rowIter = iter(infile_nffg)
 			for row in rowIter:
 				outfile.write("%s" % row)
 				if row.lstrip(' \t').startswith('<id>UUID11'):
-					with open(".info.xml", 'r') as infile:
+					with open("port_info.xml", 'r') as infile:
 						rowIter1= iter(infile)
 						for row1 in rowIter1:
 							outfile.write("%s" % row1)
 
-	with open("tmp.xml", 'r') as infile:
+	with open(".tmp.xml", 'r') as infile:
 		#return infile.read()
 		newContent = infile.read().replace(';',',')
 
@@ -1224,18 +1224,6 @@ def connectEndpoints(flowrules):
 '''
 
 api = falcon.API()
-
-#Set the logger
-#LOG = logging.getLogger(__name__)
-#LOG.setLevel(logging.DEBUG)
-#LOG.propagate = False
-#sh = logging.StreamHandler()
-#f = logging.Formatter('[%(asctime)s][Virtualizer][%(levelname)s] %(message)s')
-#sh.setFormatter(f)
-#LOG.addHandler(sh)
-#log_level = LOG.DEBUG
-#log_format = '%(asctime)s %(levelname)s %(message)s - %(filename)s'
-#LOG.basicConfig(filename="virtualizer.log", level=log_level, format=log_format, datefmt='%m/%d/%Y %I:%M:%S %p')
 
 #Global variables
 unOrchestratorURL = "http://"
