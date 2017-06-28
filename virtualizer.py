@@ -1098,7 +1098,7 @@ def adjustEscapeNffg(content):
 			flowtable.remove(flowentry)
 	"""
 	#Endpoint_vlanid handled in flowtable
-	#This function can be used in case escape have push_tag and pop_tag setted to proper values, it characterize the endpoint vlan id
+	#This function can be used in case escape have push_tag and pop_tag setted to proper values, it characterizeis the endpoint vlan id
 
 	for flowentry in flowtable:
                 if flowentry.action is not None:

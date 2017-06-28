@@ -7,7 +7,7 @@ CONFIGURATION_FILE = 'config/configuration.ini'
 '''
 
 #TMP file use by the virtualizer to maintain the current configuration of the node
-GRAPH_XML_FILE = '.universalnode.xml'
+GRAPH_XML_FILE = '.domainConfiguration.xml'
 
 #TMP file used by the virtualizer and representing the deployed graph,
 #in the JSON syntax internally used by the virtualizer itself

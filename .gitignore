@@ -3,3 +3,6 @@
 virtualizer_original.py
 virtualizer.py.ok
 *.log
+.domainConfiguration.xml
+.tmp.xml
+.txt.xml
