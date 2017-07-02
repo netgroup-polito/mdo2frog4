@@ -51,7 +51,7 @@ This abstract vision must be configured before starting the Mdo2frog4 and the Md
 	- In the file [./template.xml](template.xml) all vm images must be set with correct type and ports as showed in the file itself. 
 	  In that way when MdO will get the abstract vision of the domain, will save which vm can be launched and how many ports it can have. 
 
-	- Every port that the virtualizer must export through its northbound interface, must be set in the file setted as PortFile in the 
+	- Every port that the mdo2frog4 must export through its northbound interface, must be set in the file setted as PortFile in the 
 	  configuration file and in the file [./port_info.xml](port_info.xml). These two files have a different format. 
 	  The first must follow the format described with the xml-schema [./config/universal-node-schema.xsd](universal-node-schema.xsd).
 	  The port_info.xml must follow the format used in the xml graph to describe the port-sap(endpoint) of the controlled domain.
