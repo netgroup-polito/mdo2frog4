@@ -1,0 +1,24 @@
+<?xml version="1.0" ?>
+<virtualizer>
+		<id>UUID001</id>
+	<name>Single node</name>
+	<nodes>
+		<node>
+			<id>UUID11</id>
+			<NF_instances>
+				<node operation="delete">
+					<id>1</id>
+				</node>
+			</NF_instances>
+			<flowtable>
+				<flowentry operation="delete">
+					<id>11</id>
+				</flowentry>
+				<flowentry operation="delete">
+					<id>12</id>
+				</flowentry>
+			</flowtable>
+		</node>
+	</nodes>
+</virtualizer>
+

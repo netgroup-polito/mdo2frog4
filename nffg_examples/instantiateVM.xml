@@ -1,0 +1,54 @@
+<?xml version="1.0" ?>
+<virtualizer>
+	<id>UUID001</id>
+	<name>Single node</name>
+	<nodes>
+		<node>
+			<id>UUID11</id>
+			<NF_instances>
+				<node operation="create">
+					<id>1</id>
+					<name>example</name>
+					<type>cirros</type>
+					<ports>
+						<port>
+							<id>1</id>
+							<name>ovs1_eth0</name>
+							<port_type>port-abstract</port_type>
+							<metadata>
+								<key>vlanid</key>
+								<value>10</value>
+							</metadata>
+						</port>
+					</ports>
+					<resources>
+						<cpu>1.0</cpu>
+						<mem>1.0</mem>
+						<storage>0.0</storage>
+					</resources>
+				</node>
+			</NF_instances>
+			<flowtable>
+				<flowentry operation="create">
+					<id>11</id>
+					<priority>100</priority>
+					<port>../../../NF_instances/node[id=1]/ports/port[id=1]</port>
+					<out>../../../ports/port[id=1]</out>
+					<resources>
+						<bandwidth>0.0</bandwidth>
+					</resources>
+				</flowentry>
+				<flowentry operation="create">
+					<id>12</id>
+					<priority>100</priority>
+					<port>../../../ports/port[id=1]</port>
+					<out>../../../NF_instances/node[id=1]/ports/port[id=1]</out>
+					<resources>
+						<bandwidth>0.0</bandwidth>
+					</resources>
+				</flowentry>
+			</flowtable>
+		</node>
+	</nodes>
+</virtualizer>
+
