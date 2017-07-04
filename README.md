@@ -45,8 +45,8 @@ To get the Mdo2frog4 through GIT:
 The Mdo2frog4 reads its configuration from the file [./config/configuration.ini](config/configuration.ini), 
 which must be properly edited before starting the Mdo2frog4 itself.
 
-Mdo2frog4 export a abstract vision of the domain managed by the frog4 orchestrator. 
-This abstract vision must be configured before starting the Mdo2frog4 and the MdO:
+Mdo2frog4 export a abstract view of the domain managed by the frog4 orchestrator. 
+This abstract view must be configured before starting the Mdo2frog4 and the MdO:
 
 	- In the file [./template.xml](template.xml) all vm images must be set with correct type and ports as showed in the file itself. 
 	  In that way when MdO will get the abstract vision of the domain, will save which vm can be launched and how many ports it can have. 

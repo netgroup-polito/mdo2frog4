@@ -18,7 +18,7 @@ GRAPH_XML_FILE = '.domainConfiguration.xml'
 '''
 INFRASTRUCTURE_NAME = 'Single node'
 INFRASTRUCTURE_ID = 'UUID001'
-NODE_NAME = 'Universal Node'
+NODE_NAME = 'Domain'
 NODE_ID = 'UUID11'
 NODE_TYPE = 'BisBis'
 

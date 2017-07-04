@@ -1,4 +1,4 @@
-			<name>Universal Node</name>
+			<name>Domain</name>
 			<type>BisBis</type>
 			<ports>
 				<port>
@@ -12,5 +12,11 @@
 					<name>of:000064e9505a7f18/5098</name>
 					<port_type>port-sap</port_type>
 					<sap>sap2</sap>
+				</port>
+				<port>
+					<id>3</id>
+					<name>External_port_3</name>
+					<port_type>port-sap</port_type>
+					<sap>sap3</sap>
 				</port>
 			</ports>

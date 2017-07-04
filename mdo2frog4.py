@@ -33,7 +33,7 @@ class DoPing:
 
 class DoUsage:
 	'''
-	This class shows how to interact with the virtualizer
+	This class shows how to interact with the mdo2frog4
 	'''
 
 	def __init__(self):
@@ -43,7 +43,7 @@ class DoUsage:
 		d = '\tpost http://hostip:tcpport/get-config - query NF-FG\n'
 		e = '\tpost http://hostip:tcpport/edit-config - send NF-FG request in the post body\n'
 		f = '\n'
-		g = 'limitations (of the universal node orchestrator):\n'
+		g = 'limitations (of the mdo2frog4 ):\n'
 		h = '\tthe flowrule ID must be unique on the node.\n'
 		i = '\ttype cannot be repeated in multiple NF instances.\n'
 		j = '\tcapabilities are not supported.\n'
@@ -93,7 +93,7 @@ class DoEditConfig:
 
 	def on_post(self, req, resp):
 		'''
-		Edit the configuration of the node
+		Edit the status of the domain
 		'''
 		global unify_monitoring, fakevm
 		try:
@@ -105,31 +105,27 @@ class DoEditConfig:
 			content = adjustEscapeNffg(content)
 			#content = req.stream.read()
 			#content = req
-			LOG.debug("Body of the request after adjust:")
-			LOG.debug("%s",content)
+			#LOG.debug("Body of the request after adjust:")
+			#LOG.debug("%s",content)
 			#checkCorrectness(content)
-			LOG.debug("Body of the request adter check:")
-			LOG.debug("%s",content)
+			#LOG.debug("Body of the request after check:")
+			#LOG.debug("%s",content)
 
-			#
-			#	Extract the needed information from the message received from the network
-			#
+			# Extract the needed information from the message received from the network
 
-			vnfsToBeAdded = extractVNFsInstantiated(content)	#VNF deployed/to be deployed on the universal node
+			vnfsToBeAdded = extractVNFsInstantiated(content)	#VNF deployed/to be deployed on the controlled domain (eg. frog4 orchestrator)
+			rulesToBeAdded, endpoints = extractRules(content)	#Flowrules and endpoints installed/to be installed on the controlled domain (eg. frog4 orchestrator)
 
-			rulesToBeAdded, endpoints = extractRules(content)			#Flowrules and endpoints installed/to be installed on the universal node
-
-			#
-			# Interact with the universal node orchestrator in order to implement the required commands
-			#
+			# Interact with the frog4 orchestrator in order to implement the required commands
+			# Fakevm is a way to deploy and connect just 2 endpoints in a onos_domain without nf instance.
 			if fakevm is True:
 				fakevm = False
 				rulesToBeAdded = connectEndpoints(rulesToBeAdded)
 
-			sendToUniversalNode(rulesToBeAdded,vnfsToBeAdded, endpoints)	#Sends the new VNFs and flow rules to the universal node orchestrator
-
-
-			un_config = updateUniversalNodeConfig(content) #Updates the file containing the current configuration of the universal node, by editing the #<flowtable> and the <NF_instances> and returning the xml
+			sendToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)	#Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
+			
+			#Updates the file containing the current status of the controlled domain (eg. frog4 orchestrator), by editing the #<flowtable> and the <NF_instances> and returning the xml
+			un_config = updateDomainStatus(content)
 
 			resp.content_type = "text/xml"
 			resp.body = un_config
@@ -142,57 +138,22 @@ class DoEditConfig:
 		except ClientError:
 			resp.status = falcon.HTTP_400
 		except ServerError:
-			LOG.error("Please, press 'ctrl+c' and restart the virtualizer.")
-			LOG.error("Please, also restart the universal node orchestrator.")
+			LOG.error("Please, press 'ctrl+c' and restart the mdo2frog4.")
 			resp.status = falcon.HTTP_500
 		except Exception as err:
 			LOG.exception(err)
 			resp.status = falcon.HTTP_500
 
-def checkIfEscapeNFFG(content):
-	'''
-	check if this content is an nffg coming from Escape
-	(identified by specific syntax)
-	:param content:
-	:return:
-	'''
-	print('Content: %s' %content )
-	try:
-		tree = ET.ElementTree(ET.fromstring(content))
-	except ET.ParseError as e:
-		print('ParseError: %s' % e.message)
-		print('Line 178-virtualizer.py')
-		raise ClientError("ParseError: %s" % e.message)
-
-	infrastructure = Virtualizer.parse(root=tree.getroot())
-	universal_node = infrastructure.nodes.node[constants.NODE_ID]
-	flowtable = universal_node.flowtable
-
-	for flowentry in flowtable:
-		f_name = flowentry.name.get_value()
-		if type(f_name) is str:
-			if 'sg_hop' in f_name:
-				# only Escape uses 'sg_hop' in the flowrule name
-				return True
-
-		if flowentry.action is not None:
-			if type(flowentry.action.data) is str:
-				if 'tag' in flowentry.action.data:
-					# these flowrules contain VLAN tag actions
-					return True
-
-	return False
-
 def checkCorrectness(newContent):
 	'''
 	Check if the new configuration of the node (in particular, the flowtable) is correct:
-	*	the ports are part of the universal node
+	*	the ports are part of the underlying domain
 	*	the VNFs referenced in the flows are instantiated
 	'''
 
 	LOG.debug("Checking the correctness of the new configuration...")
 
-	LOG.debug("Reading file '%s', which contains the current configuration of the universal node...",constants.GRAPH_XML_FILE)
+	LOG.debug("Reading file '%s', which contains the current status of the controlled domain...",constants.GRAPH_XML_FILE)
 	try:
 		oldTree = ET.parse(constants.GRAPH_XML_FILE)
 	except ET.ParseError as e:
@@ -201,13 +162,11 @@ def checkCorrectness(newContent):
 	LOG.debug("File correctly read")
 
 	infrastructure = Virtualizer.parse(root=oldTree.getroot())
-	universal_node = infrastructure.nodes.node[constants.NODE_ID]
-	flowtable = universal_node.flowtable
-	nfInstances = universal_node.NF_instances
+	domain = infrastructure.nodes.node[constants.NODE_ID]
+	flowtable = domain.flowtable
+	nfInstances = domain.NF_instances
 
-	#tmpInfra = copy.deepcopy(infrastructure)
-
-	LOG.debug("Getting the new flowrules to be installed on the universal node")
+	LOG.debug("Getting the new flowrules to be sent to the controlled domain (eg. frog4 orchestrator)")
 	try:
 		newTree = ET.ElementTree(ET.fromstring(newContent))
 	except ET.ParseError as e:
@@ -243,15 +202,11 @@ def checkCorrectness(newContent):
 	#Then, we execute the checks on it!
 
 
-	LOG.debug("The new configuration of the universal node is correct!")
+	LOG.debug("The new status of the domain is correct!")
 
 def extractVNFsInstantiated(content):
 	'''
 	Parses the message and extracts the type of the deployed network functions.
-
-	As far as I understand, the 'name' in a NF is the linker between <NF_instances>
-	and <capabilities><supported_NFs>. Then, this function also checks that the type
-	of the NF to be instantiated is among those to be supported by the universal node
 	'''
 
 	global graph_id, tcp_port, unify_port_mapping, unify_monitoring, endpoint_vlanid, fakevm
@@ -271,7 +226,7 @@ def extractVNFsInstantiated(content):
 		supportedTypes.append(nfType)
 		#lowerPortId[nfType] = getLowerPortId(nf)
 
-	LOG.debug("Extracting the network functions (to be) deployed on the universal node")
+	LOG.debug("Extracting the network functions (to be) deployed on the the controlled domain (eg. frog4 orchestrator)")
 	try:
 		tree = ET.ElementTree(ET.fromstring(content))
 	except ET.ParseError as e:
@@ -279,8 +234,8 @@ def extractVNFsInstantiated(content):
 		raise ClientError("ParseError: %s" % e.message)
 
 	infrastructure = Virtualizer.parse(root=tree.getroot())
-	universal_node = infrastructure.nodes.node[constants.NODE_ID]
-	instances = universal_node.NF_instances
+	domain = infrastructure.nodes.node[constants.NODE_ID]
+	instances = domain.NF_instances
 
 	#foundTypes = []
 	nfinstances = []
@@ -306,16 +261,7 @@ def extractVNFsInstantiated(content):
 			raise ClientError("Unsupported operation for vnf: "+instance.id.get_value())
 		graph_id=instance.id.get_value()
 		vnfType = instance.name.get_value()
-		#if vnfType not in supportedTypes:
-		#	LOG.error("VNF of type '%s' is not supported by the UN!",vnfType)
-		#	raise ClientError("VNF of type "+ vnfType +" is not supported by the UN!")
 
-		#if vnfType in foundTypes:
-		#	LOG.error("Found multiple NF instances with the same type '%s'!",vnfType)
-		#	LOG.error("This is not supported by the universal node!")
-		#	raise ClientError("Found multiple NF instances with the same type "+vnfType)
-
-		#foundTypes.append(vnfType)
 		port_list = []
 		#Append the first port dedicated to management vlan
 		port_list.append(Port(_id="port:"+str(0)))
@@ -346,7 +292,7 @@ def extractVNFsInstantiated(content):
 						raise ClientError("Only tcp ports are supported on L4 configuration of VNF of type "+ vnfType)
 					l4_port = tmp[1]
 					uc = UnifyControl(vnf_tcp_port=int(l4_port), host_tcp_port=tcp_port)
-					unify_port_mapping[instance.id.get_value() + ":" + port_id + "/" + l4_address] = (unOrchestratorIP, tcp_port)
+					unify_port_mapping[instance.id.get_value() + ":" + port_id + "/" + l4_address] = (OrchestratorIP, tcp_port)
 					unify_control.append(uc)
 					tcp_port = tcp_port + 1
 			# just copy the existing l4 addresses
@@ -407,22 +353,22 @@ def extractVNFsInstantiated(content):
 
 	return nfinstances
 
-def findEndPointId(universal_node, endpoint_name):
-	endpoints = universal_node.ports
+def findEndPointId(domain, endpoint_name):
+	endpoints = domain.ports
 
 	for endpoint in endpoints:
 		if endpoint_name in endpoint.name.get_value():
 			return endpoint.id.get_value()
-	LOG.error("Endpoint '%s' not found in universal node", endpoint_name)
+	LOG.error("Endpoint '%s' not found in current domain", endpoint_name)
 
 
 def extractRules(content):
 	'''
 	Parses the message and translates the flowrules in the internal JSON representation
-	Returns the rules and the endpoints in the internal format of the universal node
+	Returns the rules and the endpoints in the internal format of the nffg_library
 	'''
 
-	LOG.debug("Extracting the flowrules to be installed in the universal node")
+	LOG.debug("Extracting the flowrules to be installed in the controlled domain (eg. frog4 orchestrator)")
 
 	try:
 		tree = ET.ElementTree(ET.fromstring(content))
@@ -431,9 +377,9 @@ def extractRules(content):
 		raise ClientError("ParseError: %s" % e.message)
 
 	infrastructure = Virtualizer.parse(root=tree.getroot())
-	universal_node = infrastructure.nodes.node[constants.NODE_ID]
-	flowtable = universal_node.flowtable
-	instances = universal_node.NF_instances
+	domain = infrastructure.nodes.node[constants.NODE_ID]
+	flowtable = domain.flowtable
+	instances = domain.NF_instances
 	for instance in instances :
 		first_id = instance.id.get_value()
 
@@ -442,7 +388,7 @@ def extractRules(content):
 	#Add the endpoint for the managment interface. This is a vlan type endpoint and the vlan id must correspond to the management vlan
 	#assigned to the area where the Openstack of the jolnet deploy the vnf
 
-	endpoints_dict["mgmt"] = EndPoint(_id="mgmt", _type="vlan",vlan_id="tn-mgmt", interface="eth0", name="management")
+	endpoints_dict["mgmt"] = EndPoint(_id="mgmt", _type="vlan",vlan_id="tn-mgmt", interface="eth0", name="management", domain=openstackDomain)
 
 	flowrules = []
 
@@ -478,7 +424,7 @@ def extractRules(content):
 			#raise ClientError("Update of flowentry is not supported by the UN! vnf: "+flowentry.id.get_value())
 
 		elif flowentry.get_operation() == 'delete':
-			#This rule has to be removed from the universal node
+			#This rule has to be removed from the graph
 			continue
 
 		elif flowentry.get_operation() != 'create':
@@ -492,7 +438,7 @@ def extractRules(content):
 		priority = flowentry.priority.get_value()
 
 		#Iterate on the match in order to translate it into the json syntax
-		#supported internally by the universal node
+		#supported by the frog4 orchestrator
 		#match = {}
 		match = Match()
 		if flowentry.match is not None:
@@ -510,7 +456,7 @@ def extractRules(content):
 					if not supportedMatch(tokens[0]):
 						raise ClientError("Not supported match")
 
-					#We have to convert the virtualizer match into the UN equivalent match
+					#We have to convert the mdo match into the frog4 equivalent match
 
 					setattr(match, equivalentMatch(tokens[0]), tokens[1])
 
@@ -528,12 +474,12 @@ def extractRules(content):
 			raise ClientError("Invalid port defined in a flowentry")
 
 		if tokens[4] == 'ports':
-			#This is a port of the universal node. We have to extract the virtualized port name
+			#This is a port of the underlying domain. We have to extract the virtualized port name
 			if port.name.get_value() not in physicalPortsVirtualization:
 				LOG.error("Physical port "+ port.name.get_value()+" is not present in the UN")
 				raise ClientError("Physical port "+ port.name.get_value()+" is not present in the UN")
 			port_name = physicalPortsVirtualization[port.name.get_value()]
-			port_id = findEndPointId(universal_node, port.name.get_value())
+			port_id = findEndPointId(domain, port.name.get_value())
 			LOG.debug("port name: %s", port.name.get_value())
 			if 'of' in port.name.get_value():
 				tokens= port.name.get_value().split('/')
@@ -544,11 +490,11 @@ def extractRules(content):
 				#check the node id to understand the correct domain where the endpoint will be deployed
 				if port_name not in endpoints_dict:
 					LOG.debug("It's an onos_domain endpoint")
-					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain='new_onos_domain')
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain=sdnDomain)
 					LOG.debug("%s", str(endpoints_dict[port_name]))
 			else:
                                 if port_name not in endpoints_dict:
-					endpoints_dict[port_name] = EndPoint(_id=str(port_id), domain='openstack', _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), domain=openstackDomain, _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
 			match.port_in = "endpoint:" + endpoints_dict[port_name].id
 		elif tokens[4] == 'NF_instances':
 			#This is a port of the NF. I have to extract the port ID and the type of the NF.
@@ -558,7 +504,7 @@ def extractRules(content):
 			port_id = int(port.id.get_value())
 			match.port_in = "vnf:"+ vnf_id + ":port:" + str(port_id)
 			# Check if this VNF port has L4 configuration. In this case rules cannot involve such port
-			if universal_node.NF_instances[vnf_id].ports[port.id.get_value()].addresses.l4.get_value() is not None:
+			if domain.NF_instances[vnf_id].ports[port.id.get_value()].addresses.l4.get_value() is not None:
 				LOG.error("It is not possibile to install flows related to a VNF port that has L4 configuration. Flowrule id: "+f_id)
 				raise ClientError("It is not possibile to install flows related to a VNF port that has L4 configuration")
 		else:
@@ -596,11 +542,11 @@ def extractRules(content):
 			raise ClientError("Invalid port "+portPath+" defined in a flowentry")
 
 		if tokens[4] == 'ports':
-			#This is a port of the universal node. We have to extract the ID
+			#This is a port of the underlying domain. I have to extract the ID
 			#Then, I have to retrieve the virtualized port name, and from there
-			#the real name of the port on the universal node
+			#the real name of the port in the domain
 			port_name = physicalPortsVirtualization[port.name.get_value()]
-			port_id = findEndPointId(universal_node, port.name.get_value())
+			port_id = findEndPointId(domain, port.name.get_value())
 			LOG.debug("port name: %s", port.name.get_value())
                         if 'of' in port.name.get_value():
 				tokens= port.name.get_value().split('/')
@@ -611,11 +557,11 @@ def extractRules(content):
                                 if port_name not in endpoints_dict:
                                         LOG.debug("It's an onos_domain endpoint")
 
-                                        endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain='new_onos_domain', _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t, name=port.name.get_value(), node_id=node_t)
+                                        endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=sdnDomain, _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t, name=port.name.get_value(), node_id=node_t)
                                         LOG.debug(endpoints_dict[port_name].getDict(domain=True))
                         else:
                                 if port_name not in endpoints_dict:
-                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain='openstack', _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
+                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=openstackDomain, _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
 
 			flowrule.actions.append(Action(output = "endpoint:" + endpoints_dict[port_name].id))
 		elif tokens[4] == 'NF_instances':
@@ -627,7 +573,7 @@ def extractRules(content):
 			flowrule.actions.append(Action(output = "vnf:" + vnf_id + ":port:" + str(port_id)))
 
 			# Check if this VNF port has L4 configuration. In this case rules cannot involve such port
-			if universal_node.NF_instances[vnf_id].ports[port.id.get_value()].addresses.l4.get_value() is not None:
+			if domain.NF_instances[vnf_id].ports[port.id.get_value()].addresses.l4.get_value() is not None:
 				LOG.error("It is not possibile to install flows related to a VNF port that has L4 configuration")
 				raise ClientError("It is not possibile to install flows related to a VNF port that has L4 configuration")
 		else:
@@ -690,15 +636,15 @@ def equivalentAction(tag):
 	return constants.equivalent_actions[tag]
 
 
-def updateUniversalNodeConfig(newContent):
+def updateDomainStatus(newContent):
 	'''
-	Read the configuration of the universal node, and applies the required modifications to
+	Read the status of the domain, and applies the required modifications to
 	the NF instances and to the flowtable
 	'''
 
-	LOG.debug("Updating the file containing the configuration of the node...")
+	LOG.debug("Updating the file containing the status of the domain...")
 
-	LOG.debug("Reading file '%s', which contains the current configuration of the universal node...",constants.GRAPH_XML_FILE)
+	LOG.debug("Reading file '%s', which contains the current status of the domain...",constants.GRAPH_XML_FILE)
 	try:
 		oldTree = ET.parse(constants.GRAPH_XML_FILE)
 	except ET.ParseError as e:
@@ -707,12 +653,12 @@ def updateUniversalNodeConfig(newContent):
 	LOG.debug("File correctly read")
 
 	infrastructure = Virtualizer.parse(root=oldTree.getroot())
-	universal_node = infrastructure.nodes.node[constants.NODE_ID]
-	flowtable = universal_node.flowtable
-	nfInstances = universal_node.NF_instances
+	domain = infrastructure.nodes.node[constants.NODE_ID]
+	flowtable = domain.flowtable
+	nfInstances = domain.NF_instances
 
 
-	#LOG.debug("Getting the new flowrules to be installed on the universal node")
+	#LOG.debug("Getting the new flowrules to be sent to the frog4 orchestrator")
 	try:
 		newTree = ET.ElementTree(ET.fromstring(newContent))
 	except ET.ParseError as e:
@@ -772,13 +718,13 @@ def updateUniversalNodeConfig(newContent):
 
 
 '''
-	Methods used to interact with the universal node orchestrator
+	Methods used to interact with the orchestrator
 '''
-def sendToUniversalNode(rules, vnfs, endpoints):
+def sendToOrchestrator(rules, vnfs, endpoints):
 	'''
-	Deploys rules and VNFs on the universal node
+	Send rules and VNFs on the orchestrator
 	'''
-	LOG.info("Sending the new configuration to the frog4 orchestrator (%s)",unOrchestratorURL)
+	LOG.info("Sending the new graph to the orchestrator (%s)",OrchestratorURL)
 	global corr_graphids
 
 	nffg = NF_FG()
@@ -795,19 +741,21 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 		if not nffg.getFlowRulesSendingTrafficToEndPoint(endpoint.id) and not nffg.getFlowRulesSendingTrafficFromEndPoint(endpoint.id):
 			nffg.end_points.remove(endpoint)
 
-	graph_url = unOrchestratorURL + "/NF-FG/"
+	graph_url = OrchestratorURL + "/NF-FG/"
 
 	try:
+		# if the nffg translated in the nffg_library version has no flowrules, no vnfs and no endpoints, it's a delete request
+		# note that the -2 is because mdo2frog4 inserts automatically the management endpoint for the jolnet environment
 		if len(nffg.flow_rules) - 2 + len(nffg.vnfs) + len(nffg.end_points) <= 1:
-			LOG.debug("No elements have to be sent to Frog4 orchestrator...sending a delete request")
+			LOG.debug("No elements have to be sent to orchestrator...sending a delete request")
 			LOG.debug("DELETE url: %s %s", graph_url, nffg.id)
 			if debug_mode is False:
 				if authentication is True and token is None:
 					getToken()
-				url = graph_url + nffg.id
+				url = graph_url + corr_graphids[nffg.id]
 				LOG.debug("url for delete: " + url)
 				responseFromFrog = requests.delete(url, headers=headers)
-				LOG.debug("Status code received from the Frog4 orchestrator: %s",responseFromFrog.status_code)
+				LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
 				if responseFromFrog.status_code == 200:
 					LOG.info("Graph successfully deleted")
 				elif responseFromFrog.status_code == 401 or responseFromFrog.status_code == 404:
@@ -822,10 +770,10 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 					#	LOG.error("Something went wrong while deleting the graph on the Frog4 orchestrator")
 					#	raise ServerError("Something went wrong while deleting the graph on the Frog4 orchestrator")
 				else:
-					LOG.error("Something went wrong while deleting the graph on the Frog4 orchestrator")
-					raise ServerError("Something went wrong while deleting the graph on the Frog4 orchestrator")
+					LOG.error("Something went wrong while deleting the graph on the orchestrator")
+					raise ServerError("Something went wrong while deleting the graph on the orchestrator")
 		else:
-			LOG.debug("Graph that is going to be sent to the frog4 orchestrator:")
+			LOG.debug("Graph that is going to be sent to the orchestrator:")
 			LOG.debug("%s",nffg.getJSON(domain=True))
 			LOG.debug("POST url: "+ graph_url)
 
@@ -835,7 +783,7 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 					getToken()
 
 				responseFromFrog = requests.put(graph_url, data=nffg.getJSON(domain=True), headers=headers)
-				LOG.debug("Status code received from the frog4 orchestrator: %s",responseFromFrog.status_code)
+				LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
 
 				if responseFromFrog.status_code == 201:
 					LOG.info("New VNFs and flows properly deployed")
@@ -847,25 +795,25 @@ def sendToUniversalNode(rules, vnfs, endpoints):
 					LOG.debug("Token expired, getting a new one...")
 					getToken()
 					newresponseFromFrog = requests.put(graph_url, data=nffg.getJSON(), headers=headers)
-					LOG.debug("Status code received from the frog4 orchestrator: %s",newresponseFromFrog.status_code)
+					LOG.debug("Status code received from the orchestrator: %s",newresponseFromFrog.status_code)
 					if newresponseFromFrog.status_code == 201:
-						LOG.info("New VNFs and flows properly deployed on the universal node")
+						LOG.info("New VNFs and flows properly deployed on the orchestrator")
 					else:
-						LOG.error("Something went wrong while deploying the new VNFs and flows on Frog4 orchestrator")
-						raise ServerError("Something went wrong while deploying the new VNFs and flows on the universal node")
+						LOG.error("Something went wrong while deploying the new VNFs and flows on orchestrator")
+						raise ServerError("Something went wrong while deploying the new VNFs and flows on the orchestrator")
 				else:
-					LOG.error("Something went wrong while deploying the new VNFs and flows on the universal node")
-					raise ServerError("Something went wrong while deploying the new VNFs and flows on the universal node")
+					LOG.error("Something went wrong while deploying the new VNFs and flows on the orchestrator")
+					raise ServerError("Something went wrong while deploying the new VNFs and flows on the orchestrator")
 
 	except (requests.ConnectionError):
-		LOG.error("Cannot contact the Frog4 orchestrator at '%s'",graph_url + nffg.id)
-		raise ServerError("Cannot contact the Frog4 orchestrator at "+graph_url)
+		LOG.error("Cannot contact the orchestrator at '%s'",graph_url + nffg.id)
+		raise ServerError("Cannot contact the orchestrator at "+graph_url)
 
 def getToken():
 	global token, headers
 	headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
 	authenticationData = {'username': username, 'password': password}
-	authentication_url = unOrchestratorURL + "/login"
+	authentication_url = OrchestratorURL + "/login"
 	resp = requests.post(authentication_url, data=json.dumps(authenticationData), headers=headers)
 	try:
 		resp.raise_for_status()
@@ -877,18 +825,18 @@ def getToken():
 		raise ServerError("login failed: " + str(err))
 
 '''
-	Methods used in the initialization phase of the virtualizer
+	Methods used in the initialization phase of the mdo2frog4
 '''
 
-def virtualizerInit():
+def mdo2frog4Init():
 	'''
-	The virtualizer maintains the state of the node in a tmp file.
+	The mdo2frog4 maintains the state of the node in a tmp file.
 	This function initializes such a file.
 	'''
 	if not setLog():
 		return False
 
-	LOG.info("Initializing the virtualizer...")
+	LOG.info("Initializing the mdo2frog4...")
 
 	if not readConfigurationFile():
 		return False
@@ -908,20 +856,19 @@ def virtualizerInit():
 	)
 
 	#Read information related to the infrastructure and add it to the
-	#virtualizer representation
+	#mdo2frog4 representation
 	LOG.debug("Reading file '%s'...",infrastructureFile)
 	try:
 		tree = ET.parse(infrastructureFile)
 	except ET.ParseError as e:
 		print('ParseError: %s' % e.message)
-		#resp.status = falcon.HTTP_500
 		return False
 	root = tree.getroot()
 
-	universal_node = v.nodes.node[constants.NODE_ID]
+	domain = v.nodes.node[constants.NODE_ID]
 
 	#Read information related to the physical ports and add it to the
-	#virtualizer representation
+	#mdo2frog4 representation
 
 	#global physicalPortsVirtualization
 
@@ -934,10 +881,10 @@ def virtualizerInit():
 		physicalPortsVirtualization[port_description['as']] =  port.attrib['name']
 
 		portObject = Virt_Port(id=str(portID), name=port_description['as'], port_type=port_description['port-type'], sap=port_description['sap'])
-		universal_node.ports.add(portObject)
+		domain.ports.add(portObject)
 		portID = portID + 1
 
-	#Save the virtualizer representation on a file
+	#Save the mdo2frog4 representation on a file
 	try:
 		tmpFile = open(constants.GRAPH_XML_FILE, "w")
 		tmpFile.write(v.xml())
@@ -946,22 +893,22 @@ def virtualizerInit():
 		print "I/O error({0}): {1}".format(e.errno, e.strerror)
 		return False
 
-	LOG.info("The virtualizer has been initialized")
+	LOG.info("The mdo2frog4 has been initialized")
 	return True
 
 def readConfigurationFile():
 	'''
-	Read the configuration file of the virtualizer
+	Read the configuration file of the mdo2frog4
 	'''
 
-	global nameResolverURL
-	global unOrchestratorIP
-	global unOrchestratorURL
+	global OrchestratorIP
+	global OrchestratorURL
 	global debug_mode
 	global infrastructureFile
 	global cpu, memory, storage
 	global authentication, username, password, tenant
 	global headers
+	global sdnDomain, openstackDomain
 
 	LOG.info("Reading configuration file: '%s'",constants.CONFIGURATION_FILE)
 	config = ConfigParser.ConfigParser()
@@ -972,8 +919,8 @@ def readConfigurationFile():
 		LOG.error("Wrong file '%s'. It does not include the section 'connections' :(",constants.CONFIGURATION_FILE)
 		return False
 	try:
-		unOrchestratorIP = config.get("connections","Frog4OrchestratorAddress")
-		unOrchestratorURL = unOrchestratorURL + unOrchestratorIP + ":" + config.get("connections","Frog4OrchestratorPort")
+		OrchestratorIP = config.get("connections","Frog4OrchestratorAddress")
+		OrchestratorURL = OrchestratorURL + OrchestratorIP + ":" + config.get("connections","Frog4OrchestratorPort")
 	except:
 		LOG.error("Option 'Frog4OrchestratorAddress' or option 'Frog4OrchestratorPort' not found in section 'connections' of file '%s'",constants.CONFIGURATION_FILE)
 		return False
@@ -1003,6 +950,17 @@ def readConfigurationFile():
 	except:
 		LOG.error("Option 'cpu' or 'memory' or 'storage' not found in section 'resources' of file '%s'",constants.CONFIGURATION_FILE)
 		return False
+	
+	if 'domains' not in sections:
+		LOG.error("Wrong file '%s'. It does not include the section 'domains' :(",constants.CONFIGURATION_FILE)
+		return False
+	try:
+		sdnDomain = config.get("domains","sdnDomain")
+		openstackDomain = config.get("domains","openstackDomain")
+		LOG.debug('Domains found : sdnDomain= ' + sdnDomain + 'openstackDomain= ' + openstackDomain)
+	except:
+		LOG.error("Option 'sdnDomain' or 'openstackDomain' not found in section 'domains' of file '%s'",constants.CONFIGURATION_FILE)
+		return False
 
 	if 'configuration' not in sections:
 		LOG.error("Wrong file '%s'. It does not include the section 'configuration' :(",constants.CONFIGURATION_FILE)
@@ -1024,37 +982,12 @@ def readConfigurationFile():
 	except:
 		LOG.error("Option 'PortFile' not found in section 'configuration' of file '%s'",constants.CONFIGURATION_FILE)
 		return False
-	"""
-	try:
-		LogLevel = config.get("configuration","LogLevel")
-		if LogLevel == 'debug':
-			LOG.debug("Line : - 1028")
-			LOG.setLevel(LOG.DEBUG)
-			#LOG.addHandler(sh)
-			LOG.debug("Log level set to 'debug'")
-		if LogLevel == 'info':
-			LOG.setLevel(LOG.INFO)
-			LOG.info("Log level set to 'info'")
-		if LogLevel == 'warning':
-			LOG.setLevel(LOG.WARNING)
-			LOG.warning("Log level set to 'warning'")
-		if LogLevel == 'error':
-			LOG.setLevel(LOG.ERROR)
-			LOG.error("Log level set to 'error'")
-		if LogLevel == 'critical':
-			LOG.setLevel(LOG.CRITICAL)
-			LOG.critical("Log level set to 'critical'")
-	except:
-		LOG.warning("Option 'LogLevel' not found in section 'configuration' of file '%s'",constants.CONFIGURATION_FILE)
-		LOG.warning("Log level is set on 'DEBUG'")
-	"""
 
 	LOG.debug("CPU: %s", cpu)
 	LOG.debug("memory: %s", memory)
 	LOG.debug("storage: %s", storage)
 
-	LOG.info("Url used to contact the name-resolver: %s",nameResolverURL)
-	LOG.info("Url used to contact the universal node orchestrator: %s",unOrchestratorURL)
+	LOG.info("Url used to contact the orchestrator: %s",OrchestratorURL)
 
 	return True
 
@@ -1091,8 +1024,8 @@ def adjustEscapeNffg(content):
 		raise ClientError("ParseError: %s" % e.message)
 
 	infrastructure = Virtualizer.parse(root=tree.getroot())
-	universal_node = infrastructure.nodes.node[constants.NODE_ID]
-	flowtable = universal_node.flowtable
+	domain = infrastructure.nodes.node[constants.NODE_ID]
+	flowtable = domain.flowtable
 	for flowentry in flowtable:
 		if flowentry.get_operation() != "delete" and flowentry.get_operation() != "create":
 			flowtable.remove(flowentry)
@@ -1130,7 +1063,7 @@ def adjustEscapeNffg(content):
                                         if not supportedMatch(tokens[0]):
                                         	raise ClientError("Not supported match")
                                         if tokens[0] == "dl_tag" or tokens[0] == "push_tag" or tokens[0] == "pop_tag":
-						LOG.debug("Match deleted")
+											LOG.debug("Match deleted")
                                         else:
 						if adjusted_matches == "":
 							adjusted_matches = adjusted_matches +  m
@@ -1189,8 +1122,8 @@ def setLog():
 		if LogLevel == 'critical':
 			log_level_tmp = LOG.CRITICAL
 	except:
-		return False	
-	
+		return False
+
 	log_level = log_level_tmp
 	log_format = '%(asctime)s %(levelname)s %(message)s - %(filename)s'
 	LOG.basicConfig(filename=LogFile, level=log_level, format=log_format, datefmt='%m/%d/%Y %I:%M:%S %p')
@@ -1220,14 +1153,14 @@ def connectEndpoints(flowrules):
 	return newFlowRules
 
 '''
-	The following code is executed by guicorn at the boot of the virtualizer
+	The following code is executed by guicorn at the boot of the mdo2frog4
 '''
 
 api = falcon.API()
 
 #Global variables
-unOrchestratorURL = "http://"
-nameResolverURL = "http://"
+OrchestratorURL = "http://"
+OrchestratorIP = ""
 infrastructureFile = ""
 physicalPortsVirtualization = {}
 graph_id = "default1"
@@ -1241,18 +1174,19 @@ storage = ""
 authentication = False
 username = ""
 password = ""
-tenant =""
+tenant = ""
 token = None
 headers = {}
 endpoint_vlanid = []
 corr_graphids = {}
 fakevm = False
-# if debug_mode is True no interactions will be made with the UN
 debug_mode = False
+sdnDomain = ""
+openstackDomain = ""
 
-if not virtualizerInit():
-	LOG.error("Failed to start up the virtualizer.")
-	LOG.error("Please, press 'ctrl+c' and restart the virtualizer.")
+if not mdo2frog4Init():
+	LOG.error("Failed to start up the mdo2frog4.")
+	LOG.error("Please, press 'ctrl+c' and restart the mdo2frog4.")
 
 loadTemplates()
 api.add_route('/virt',DoUsage())
@@ -1260,8 +1194,3 @@ api.add_route('/virt/ping',DoPing())
 api.add_route('/virt/get-config',DoGetConfig())
 api.add_route('/virt/edit-config',DoEditConfig())
 
-#in_file = open ("config/nffg_examples/passthrough_with_vnf_nffg_v5.xml")
-#in_file = open ("config/nffg_examples/nffg_delete_flow_vnf.xml")
-#in_file = open ("config/nffg_examples/er_nffg_virtualizer5.xml")
-#in_file = open ("config/nffg_examples/step1.xml")
-#DoEditConfig().on_post(in_file.read(), None)

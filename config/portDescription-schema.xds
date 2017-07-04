@@ -14,7 +14,7 @@
 
 
 <!-- definition of elements -->
-<xsd:element name="universal-node">
+<xsd:element name="port-description">
 	<xsd:complexType>
 		<xsd:all>
 		
