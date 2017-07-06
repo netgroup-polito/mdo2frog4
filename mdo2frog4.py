@@ -74,6 +74,7 @@ class DoGetConfig:
 			tree = ET.parse(constants.GRAPH_XML_FILE)
 		except ET.ParseError as e:
 			print('ParseError: %s' % e.message)
+			LOG.error('ParseError: %s', e.message)
 			resp.status = falcon.HTTP_500
 			return
 
@@ -158,6 +159,7 @@ def checkCorrectness(newContent):
 		oldTree = ET.parse(constants.GRAPH_XML_FILE)
 	except ET.ParseError as e:
 		print('ParseError: %s' % e.message)
+		LOG.error('ParseError: %s', e.message)
 		raise ServerError("ParseError: %s" % e.message)
 	LOG.debug("File correctly read")
 
@@ -171,6 +173,7 @@ def checkCorrectness(newContent):
 		newTree = ET.ElementTree(ET.fromstring(newContent))
 	except ET.ParseError as e:
 		print('ParseError: %s' % e.message)
+		LOG.error('ParseError: %s', e.message)
 		raise ClientError("ParseError: %s" % e.message)
 
 	newInfrastructure = Virtualizer.parse(root=newTree.getroot())
@@ -215,6 +218,7 @@ def extractVNFsInstantiated(content):
 		tree = ET.parse(constants.GRAPH_XML_FILE)
 	except ET.ParseError as e:
 		print('ParseError: %s' % e.message)
+		LOG.error('ParseError: %s', e.message)
 		raise ServerError("ParseError: %s" % e.message)
 
 	tmpInfrastructure = Virtualizer.parse(root=tree.getroot())
@@ -231,6 +235,7 @@ def extractVNFsInstantiated(content):
 		tree = ET.ElementTree(ET.fromstring(content))
 	except ET.ParseError as e:
 		print('ParseError: %s' % e.message)
+		LOG.error('ParseError: %s', e.message)
 		raise ClientError("ParseError: %s" % e.message)
 
 	infrastructure = Virtualizer.parse(root=tree.getroot())
@@ -374,6 +379,7 @@ def extractRules(content):
 		tree = ET.ElementTree(ET.fromstring(content))
 	except ET.ParseError as e:
 		print('ParseError: %s' % e.message)
+		LOG.error('ParseError: %s', e.message)
 		raise ClientError("ParseError: %s" % e.message)
 
 	infrastructure = Virtualizer.parse(root=tree.getroot())
@@ -649,6 +655,7 @@ def updateDomainStatus(newContent):
 		oldTree = ET.parse(constants.GRAPH_XML_FILE)
 	except ET.ParseError as e:
 		print('ParseError: %s' % e.message)
+		LOG.error('ParseError: %s', e.message)
 		raise ServerError("ParseError: %s" % e.message)
 	LOG.debug("File correctly read")
 
@@ -663,6 +670,7 @@ def updateDomainStatus(newContent):
 		newTree = ET.ElementTree(ET.fromstring(newContent))
 	except ET.ParseError as e:
 		print('ParseError: %s' % e.message)
+		LOG.error('ParseError: %s', e.message)
 		raise ServerError("ParseError: %s" % e.message)
 
 	newInfrastructure = Virtualizer.parse(root=newTree.getroot())
@@ -712,6 +720,7 @@ def updateDomainStatus(newContent):
 		tmpFile.close()
 	except IOError as e:
 		print "I/O error({0}): {1}".format(e.errno, e.strerror)
+		LOG.error('I/O error')
 		raise ServerError("I/O error")
 
 	return infrastructure.xml()
@@ -862,6 +871,7 @@ def mdo2frog4Init():
 		tree = ET.parse(infrastructureFile)
 	except ET.ParseError as e:
 		print('ParseError: %s' % e.message)
+		LOG.error('ParseError: %s', e.message)
 		return False
 	root = tree.getroot()
 
@@ -891,6 +901,7 @@ def mdo2frog4Init():
 		tmpFile.close()
 	except IOError as e:
 		print "I/O error({0}): {1}".format(e.errno, e.strerror)
+		LOG.error('I/O error')
 		return False
 
 	LOG.info("The mdo2frog4 has been initialized")
@@ -1021,6 +1032,7 @@ def adjustEscapeNffg(content):
 		tree = ET.ElementTree(ET.fromstring(newContent))
 	except ET.ParseError as e:
 		print('ParseError: %s' % e.message)
+		LOG.error('ParseError: %s', e.message)
 		raise ClientError("ParseError: %s" % e.message)
 
 	infrastructure = Virtualizer.parse(root=tree.getroot())
