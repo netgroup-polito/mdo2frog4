@@ -212,7 +212,7 @@ def extractVNFsInstantiated(content):
 	Parses the message and extracts the type of the deployed network functions.
 	'''
 
-	global graph_id, tcp_port, unify_port_mapping, unify_monitoring, endpoint_vlanid, fakevm
+	global graph_id, tcp_port, unify_port_mapping, unify_monitoring, fakevm
 
 	try:
 		tree = ET.parse(constants.GRAPH_XML_FILE)
@@ -330,9 +330,7 @@ def extractVNFsInstantiated(content):
 			if port.control.orchestrator.get_as_text() is not None:
 				unify_env_variables.append("CFOR="+port.control.orchestrator.get_as_text())
 			if port.metadata.length() > 0:
-				#LOG.error("Metadata are not supported inside a port element. Those should specified per node")
-				vlan_id = port.metadata['vlanid'].value.get_as_text()
-				endpoint_vlanid.append(vlan_id)
+				LOG.error("Metadata are not supported inside a port element. Those should specified per node")
 		if instance.metadata.length() > 0:
 			for metadata_id in instance.metadata:
 				metadata = instance.metadata[metadata_id]
@@ -389,7 +387,6 @@ def extractRules(content):
 	for instance in instances :
 		first_id = instance.id.get_value()
 
-	endpoint_vlanid.reverse() #contain all vlan id to set in endpoint vlan id, it pop from the last element, so i reverse to get element in order
 	endpoints_dict = {}
 	#Add the endpoint for the managment interface. This is a vlan type endpoint and the vlan id must correspond to the management vlan
 	#assigned to the area where the Openstack of the jolnet deploy the vnf
@@ -487,6 +484,8 @@ def extractRules(content):
 			port_name = physicalPortsVirtualization[port.name.get_value()]
 			port_id = findEndPointId(domain, port.name.get_value())
 			LOG.debug("port name: %s", port.name.get_value())
+			e_domain = endpoints_domain[int(port_id)]
+                        e_vlanid = endpoints_vlanid[int(port_id)]
 			if 'of' in port.name.get_value():
 				tokens= port.name.get_value().split('/')
 				LOG.debug("node: %s", tokens[0])
@@ -496,11 +495,11 @@ def extractRules(content):
 				#check the node id to understand the correct domain where the endpoint will be deployed
 				if port_name not in endpoints_dict:
 					LOG.debug("It's an onos_domain endpoint")
-					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain=sdnDomain)
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(e_vlanid), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain=e_domain)
 					LOG.debug("%s", str(endpoints_dict[port_name]))
 			else:
                                 if port_name not in endpoints_dict:
-					endpoints_dict[port_name] = EndPoint(_id=str(port_id), domain=openstackDomain, _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
+					endpoints_dict[port_name] = EndPoint(_id=str(port_id), domain=e_domain, _type="vlan",vlan_id=str(e_vlanid), interface=str(port_id),name=port.name.get_value())
 			match.port_in = "endpoint:" + endpoints_dict[port_name].id
 		elif tokens[4] == 'NF_instances':
 			#This is a port of the NF. I have to extract the port ID and the type of the NF.
@@ -553,8 +552,12 @@ def extractRules(content):
 			#the real name of the port in the domain
 			port_name = physicalPortsVirtualization[port.name.get_value()]
 			port_id = findEndPointId(domain, port.name.get_value())
-			LOG.debug("port name: %s", port.name.get_value())
-                        if 'of' in port.name.get_value():
+			LOG.debug("port name: %s - port id: %s", port.name.get_value(), str(port_id))
+			e_domain = endpoints_domain[int(port_id)]
+			e_vlanid = endpoints_vlanid[int(port_id)]
+			LOG.debug("Domain: %s - vlanid: %s", e_domain, str(e_vlanid))
+			
+			if 'of' in port.name.get_value():
 				tokens= port.name.get_value().split('/')
 	                        LOG.debug("node: %s", tokens[0])
         	                LOG.debug("interface: %s", tokens[1])
@@ -563,11 +566,11 @@ def extractRules(content):
                                 if port_name not in endpoints_dict:
                                         LOG.debug("It's an onos_domain endpoint")
 
-                                        endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=sdnDomain, _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=interface_t, name=port.name.get_value(), node_id=node_t)
+                                        endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=e_domain, _type="vlan",vlan_id=e_vlanid, interface=interface_t, name=port.name.get_value(), node_id=node_t)
                                         LOG.debug(endpoints_dict[port_name].getDict(domain=True))
                         else:
                                 if port_name not in endpoints_dict:
-                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=openstackDomain, _type="vlan",vlan_id=str(endpoint_vlanid.pop()), interface=str(port_id),name=port.name.get_value())
+                                	endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=e_domain, _type="vlan",vlan_id=e_vlanid, interface=str(port_id),name=port.name.get_value())
 
 			flowrule.actions.append(Action(output = "endpoint:" + endpoints_dict[port_name].id))
 		elif tokens[4] == 'NF_instances':
@@ -881,13 +884,18 @@ def mdo2frog4Init():
 	#mdo2frog4 representation
 
 	#global physicalPortsVirtualization
+	global endpoints_domain, endpoints_vlanid
 
 	ports = root.find('ports')
 	portID = 1
 	for port in ports:
 		virtualized = port.find('virtualized')
 		port_description = virtualized.attrib
-		LOG.debug("physicl name: %s - virtualized name: %s - type: %s - sap: %s", port.attrib['name'], port_description['as'],port_description['port-type'],port_description['sap'])
+		LOG.debug("physicl name: %s - virtualized name: %s - type: %s - sap: %s - endpoint domain: %s - vlanid: %s", port.attrib['name'], port_description['as'],port_description['port-type'],port_description['sap'], port_description['endpoint_domain'], port_description['vlanid'])
+		endpoints_domain[portID] = port_description['endpoint_domain']
+		endpoints_vlanid[portID] = port_description['vlanid']
+		LOG.debug('Double check: d: %s , vid: %s', endpoints_domain[portID], endpoints_vlanid[portID])
+
 		physicalPortsVirtualization[port_description['as']] =  port.attrib['name']
 
 		portObject = Virt_Port(id=str(portID), name=port_description['as'], port_type=port_description['port-type'], sap=port_description['sap'])
@@ -919,7 +927,6 @@ def readConfigurationFile():
 	global cpu, memory, storage
 	global authentication, username, password, tenant
 	global headers
-	global sdnDomain, openstackDomain
 
 	LOG.info("Reading configuration file: '%s'",constants.CONFIGURATION_FILE)
 	config = ConfigParser.ConfigParser()
@@ -962,17 +969,6 @@ def readConfigurationFile():
 		LOG.error("Option 'cpu' or 'memory' or 'storage' not found in section 'resources' of file '%s'",constants.CONFIGURATION_FILE)
 		return False
 	
-	if 'domains' not in sections:
-		LOG.error("Wrong file '%s'. It does not include the section 'domains' :(",constants.CONFIGURATION_FILE)
-		return False
-	try:
-		sdnDomain = config.get("domains","sdnDomain")
-		openstackDomain = config.get("domains","openstackDomain")
-		LOG.debug('Domains found : sdnDomain= ' + sdnDomain + 'openstackDomain= ' + openstackDomain)
-	except:
-		LOG.error("Option 'sdnDomain' or 'openstackDomain' not found in section 'domains' of file '%s'",constants.CONFIGURATION_FILE)
-		return False
-
 	if 'configuration' not in sections:
 		LOG.error("Wrong file '%s'. It does not include the section 'configuration' :(",constants.CONFIGURATION_FILE)
 		return False
@@ -1008,7 +1004,6 @@ def adjustEscapeNffg(content):
 	#.txt.xml is the incoming nffg from escape (input)
 	#info.xml contain the information to add to escape nffg (sap)
 
-        #global endpoint_vlanid
 	LOG.debug("Adjusting the Escape Nffg")
 	with open(".txt.xml", "w") as text_file:
 		text_file.write("%s" % content)
@@ -1041,23 +1036,6 @@ def adjustEscapeNffg(content):
 	for flowentry in flowtable:
 		if flowentry.get_operation() != "delete" and flowentry.get_operation() != "create":
 			flowtable.remove(flowentry)
-	"""
-	#Endpoint_vlanid handled in flowtable
-	#This function can be used in case escape have push_tag and pop_tag setted to proper values, it characterizeis the endpoint vlan id
-
-	for flowentry in flowtable:
-                if flowentry.action is not None:
-                        if type(flowentry.action.get_value()) is str:
-                                actions = re.split(',| ', flowentry.action.data)
-                                for a in actions:
-                                        tokens = a.split(":")
-                                        if tokens[0] == "push_tag":
-                                                        vlan_id = tokens[1]
-                                                        splitted_vlan_id = vlan_id.split('x')
-                                                        vlan_id= splitted_vlan_id[1]
-                                                        LOG.debug("Vlan_id:" + vlan_id)
-                                                        endpoint_vlanid.append(str(vlan_id))
-	"""
 	for flowentry in flowtable:
 		if flowentry.action is not None:
 			flowentry.action = None
@@ -1193,8 +1171,8 @@ endpoint_vlanid = []
 corr_graphids = {}
 fakevm = False
 debug_mode = False
-sdnDomain = ""
-openstackDomain = ""
+endpoints_domain = {}
+endpoints_vlanid = {}
 
 if not mdo2frog4Init():
 	LOG.error("Failed to start up the mdo2frog4.")

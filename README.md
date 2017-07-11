@@ -27,8 +27,8 @@ The Mdo2frog4 works only with python 2.7 version.
 	$ sudo pip install gunicorn falcon cython requests
 
 	; Install the virtualizer library
-	; The virtualizer library has to be installed. After installing the python library, in the virtualizer_library directory there is a README with the instructions
-	; to install this library.
+	; The virtualizer library has to be installed. After installing the python library, in the virtualizer_library directory 
+	; there is a README with the instructions to install this library.
 
 ## Getting the code
 
@@ -53,7 +53,9 @@ This abstract view must be configured before starting the Mdo2frog4 and the MdO:
 
 	- Every port that the mdo2frog4 must export through its northbound interface, must be set in the file setted as PortFile in the 
 	  configuration file and in the file [./port_info.xml](port_info.xml). These two files have a different format. 
-	  The first must follow the format described with the xml-schema [./config/universal-node-schema.xsd](universal-node-schema.xsd).
+	  The first file uses the format described with the xml-schema [./config/universal-node-schema.xsd](universal-node-schema.xsd).
+	  In this file must be set for each port, a generic port name, the name used in the underlying domain, the port type, the sap id, the domain
+	  to which correspond and the vlan id, because these port will be translated as vlan endpoints.
 	  The port_info.xml must follow the format used in the xml graph to describe the port-sap(endpoint) of the controlled domain.
 
 The Mdo2frog4 stores the actual configuration of the domain in a automatically created file called .domainConfiguration.xml.

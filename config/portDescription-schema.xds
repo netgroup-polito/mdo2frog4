@@ -31,6 +31,8 @@
 											<xsd:attribute name="as" type="xsd:string" use="required"/>
 											<xsd:attribute ref="port-type" use="required"/>
 											<xsd:attribute name="sap" type="xsd:string"/>
+											<xsd:attribute name="endpoint_domain" type="xsd:string"/>
+											<xsd:attribute name="vlanid" type="xsd:string"/>
 										</xsd:complexType>
 									</xsd:element> <!-- End <virtualized> -->
 																		

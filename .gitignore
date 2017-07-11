@@ -7,3 +7,5 @@ virtualizer.py.ok
 .domainConfiguration.xml
 .tmp.xml
 .txt.xml
+config/*.original
+config/*.bup
