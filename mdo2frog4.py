@@ -390,11 +390,11 @@ def extractRules(content):
 	endpoints_dict = {}
 	#Add the endpoint for the managment interface. This is a vlan type endpoint and the vlan id must correspond to the management vlan
 	#assigned to the area where the Openstack of the jolnet deploy the vnf
-
-	endpoints_dict["mgmt"] = EndPoint(_id="mgmt", _type="vlan",vlan_id="tn-mgmt", interface="eth0", name="management", domain=openstackDomain)
+	
+	#endpoints_dict["mgmt"] = EndPoint(_id="mgmt", _type="vlan",vlan_id="tn-mgmt", interface="eth0", name="management", domain=endpoints_domain[3])
 
 	flowrules = []
-
+	'''
 	#Add the rules for the management endpoint
 	tmp_flowrule1 = FlowRule()
 	tmp_flowrule1.id = "M1A"
@@ -415,7 +415,7 @@ def extractRules(content):
 	tmp_flowrule2.match = tmp_match;
 	tmp_flowrule2.actions.append(tmp_action)
 	flowrules.append(tmp_flowrule2)
-
+	'''
 	for flowentry in flowtable:
 
 		if flowentry.get_operation() is None:
@@ -891,9 +891,10 @@ def mdo2frog4Init():
 	for port in ports:
 		virtualized = port.find('virtualized')
 		port_description = virtualized.attrib
-		LOG.debug("physicl name: %s - virtualized name: %s - type: %s - sap: %s - endpoint domain: %s - vlanid: %s", port.attrib['name'], port_description['as'],port_description['port-type'],port_description['sap'], port_description['endpoint_domain'], port_description['vlanid'])
+		vlanid = port.find('vlanid').text
+		LOG.debug("physicl name: %s - virtualized name: %s - type: %s - sap: %s - endpoint domain: %s - vlanid: %s", port.attrib['name'], port_description['as'],port_description['port-type'],port_description['sap'], port_description['endpoint_domain'], vlanid)
 		endpoints_domain[portID] = port_description['endpoint_domain']
-		endpoints_vlanid[portID] = port_description['vlanid']
+		endpoints_vlanid[portID] = vlanid
 		LOG.debug('Double check: d: %s , vid: %s', endpoints_domain[portID], endpoints_vlanid[portID])
 
 		physicalPortsVirtualization[port_description['as']] =  port.attrib['name']

@@ -32,10 +32,9 @@
 											<xsd:attribute ref="port-type" use="required"/>
 											<xsd:attribute name="sap" type="xsd:string"/>
 											<xsd:attribute name="endpoint_domain" type="xsd:string"/>
-											<xsd:attribute name="vlanid" type="xsd:string"/>
 										</xsd:complexType>
 									</xsd:element> <!-- End <virtualized> -->
-																		
+									<xsd:element name="vlanid" minOccurs="1" maxOccurs="1" type="xsd:string"></xsd:element>								
 								</xsd:sequence>
 								
 								<xsd:attribute name="name" type="xsd:string" use="required"/>

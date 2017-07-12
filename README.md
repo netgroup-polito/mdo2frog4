@@ -1,7 +1,7 @@
 # Mdo2frog4
 
-The Mdo2frog4 is an intermediate module is between the [https://github.com/netgroup-polito/frog4-orchestrator/]FROG4 
-global orchestrator and the upper layers of the Unify architecture. It operates as follows:
+The Mdo2frog4 is an intermediate module situated between the [https://github.com/netgroup-polito/frog4-orchestrator](FROG4 
+global orchestrator) and the upper layers of the Unify architecture. It operates as follows:
   * receives commands from the upper layers of the Unify architecture based on the virtualizer 
     library defined by WP3;
   * converts those commands in the formalism natively supported by the FROG4 orchestrator
@@ -15,7 +15,7 @@ In this case the virtualizer(renamed in Mdo2frog4) interact through its northbou
 
 ## Required libraries
 
-The Mdo2frog4 works only with python 2.7 version.
+The Mdo2frog4 works only with python 2.7
 
 	; Install required libraries
 	; - libxml2-dev: nice library to parse and create xml
@@ -42,26 +42,30 @@ To get the Mdo2frog4 through GIT:
 	
 ## How to configure the Mdo2frog4
 
-The Mdo2frog4 reads its configuration from the file [./config/configuration.ini](config/configuration.ini), 
+The Mdo2frog4 gets its configuration from the file [./config/configuration.ini](config/configuration.ini), 
 which must be properly edited before starting the Mdo2frog4 itself.
 
-Mdo2frog4 export a abstract view of the domain managed by the frog4 orchestrator. 
+Mdo2frog4 export an abstract view of the domain managed by the frog4 orchestrator. 
 This abstract view must be configured before starting the Mdo2frog4 and the MdO:
 
-	- In the file [./template.xml](template.xml) all vm images must be set with correct type and ports as showed in the file itself. 
-	  In that way when MdO will get the abstract vision of the domain, will save which vm can be launched and how many ports it can have. 
+	- In the file [./template.xml](template.xml) all VM images must be set with correct type and ports as showed in the file itself. 
+	  In that way when MdO will get the abstract view of the domain, it will save which VMs can be launched and how many ports it can have. 
 
-	- Every port that the mdo2frog4 must export through its northbound interface, must be set in the file setted as PortFile in the 
-	  configuration file and in the file [./port_info.xml](port_info.xml). These two files have a different format. 
-	  The first file uses the format described with the xml-schema [./config/universal-node-schema.xsd](universal-node-schema.xsd).
+	- In the file [./port_info.xml](port_info.xml) all the ports of the controlled domain must be set with correct id, name, port-type and eventually sap.
+	  In that way when MdO will get the abstract view of the domain, it will understand how many ports there are in the controlled domain and which these port are.
+
+	- Every port that the mdo2frog4 must export through its northbound interface, must be also set in the file setted as PortFile in the 
+	  configuration file [./config/configuration.ini](config/configuration.ini)(in the configuration.ini sample this file is called portDescription.ini).
+	  [./config/portDescription.ini](config/portDescription.ini) uses the format described with the xml-schema [./config/portDescription-schema.xsd](portDescription-schema.xsd).
 	  In this file must be set for each port, a generic port name, the name used in the underlying domain, the port type, the sap id, the domain
 	  to which correspond and the vlan id, because these port will be translated as vlan endpoints.
-	  The port_info.xml must follow the format used in the xml graph to describe the port-sap(endpoint) of the controlled domain.
+	  
+	The content of port_info.xml and template.xml is added to a temporary file that represents the actual status of the mdo2frog4 in the same format used by the MdO to build its xml graphs. 
+	port_info.xml and template.xml are validated by virtualizerzer library.
 
-The Mdo2frog4 stores the actual configuration of the domain in a automatically created file called .domainConfiguration.xml.
-This file contains the underlying domain current view. At start time, this file contains a representation of the domain calculated from the configuration files 
+The Mdo2frog4 stores the actual configuration and status of the domain in a automatically created file called .domainConfiguration.xml.
+This file contains the underlying domain current view. At start time, it contains a representation of the domain calculated from the configuration files 
 named above. When a NFFG is deployed succesfully, this file is updated with the new nf_instance and new flow rules.
-
 
 ## How to run the Mdo2frog4
 
@@ -83,7 +87,7 @@ In particular:
 
 The Mdo2frog4 accept commands through its REST interface. The main REST commands 
 to be used to interact with it are detailed in the following.
-The Mdo2frog4 uses the NETCONF protocol
+The Mdo2frog4 uses the NETCONF protocol.
 
 Get information about the Mdo2frog4
 
