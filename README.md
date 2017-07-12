@@ -48,20 +48,20 @@ which must be properly edited before starting the Mdo2frog4 itself.
 Mdo2frog4 export an abstract view of the domain managed by the frog4 orchestrator. 
 This abstract view must be configured before starting the Mdo2frog4 and the MdO:
 
-	- In the file [./template.xml](template.xml) all VM images must be set with correct type and ports as showed in the file itself. 
-	  In that way when MdO will get the abstract view of the domain, it will save which VMs can be launched and how many ports it can have. 
+- In the file [./template.xml](template.xml) all VM images must be set with correct type and ports as showed in the file itself. 
+  In that way when MdO will get the abstract view of the domain, it will save which VMs can be launched and how many ports it can have. 
 
-	- In the file [./port_info.xml](port_info.xml) all the ports of the controlled domain must be set with correct id, name, port-type and eventually sap.
-	  In that way when MdO will get the abstract view of the domain, it will understand how many ports there are in the controlled domain and which these port are.
+- In the file [./port_info.xml](port_info.xml) all the ports of the controlled domain must be set with correct id, name, port-type and eventually sap.
+  In that way when MdO will get the abstract view of the domain, it will understand how many ports there are in the controlled domain and which these port are.
 
-	- Every port that the mdo2frog4 must export through its northbound interface, must be also set in the file setted as PortFile in the 
-	  configuration file [./config/configuration.ini](config/configuration.ini)(in the configuration.ini sample this file is called portDescription.ini).
-	  [./config/portDescription.ini](config/portDescription.ini) uses the format described with the xml-schema [./config/portDescription-schema.xsd](portDescription-schema.xsd).
-	  In this file must be set for each port, a generic port name, the name used in the underlying domain, the port type, the sap id, the domain
-	  to which correspond and the vlan id, because these port will be translated as vlan endpoints.
+- Every port that the mdo2frog4 must export through its northbound interface, must be also set in the file setted as PortFile in the 
+  configuration file [./config/configuration.ini](config/configuration.ini)(in the configuration.ini sample this file is called portDescription.ini).
+  [./config/portDescription.ini](config/portDescription.ini) uses the format described with the xml-schema [./config/portDescription-schema.xsd](portDescription-schema.xsd).
+  In this file must be set for each port, a generic port name, the name used in the underlying domain, the port type, the sap id, the domain
+  to which correspond and the vlan id, because these port will be translated as vlan endpoints.
 	  
-	The content of port_info.xml and template.xml is added to a temporary file that represents the actual status of the mdo2frog4 in the same format used by the MdO to build its xml graphs. 
-	port_info.xml and template.xml are validated by virtualizerzer library.
+The content of port_info.xml and template.xml is added to a temporary file that represents the actual status of the mdo2frog4 in the same format used by the MdO to build its xml graphs. 
+port_info.xml and template.xml are validated by virtualizerzer library.
 
 The Mdo2frog4 stores the actual configuration and status of the domain in a automatically created file called .domainConfiguration.xml.
 This file contains the underlying domain current view. At start time, it contains a representation of the domain calculated from the configuration files 
