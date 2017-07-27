@@ -13,23 +13,6 @@ with the upper layes of the Unify architecture.
 In this case the virtualizer(renamed in Mdo2frog4) interact through its northbound with the MultiDomain Orchestrator
 (that is basically Escape) and through its southbound with the FROG4 global orchestrator.
 
-## Required libraries
-
-The Mdo2frog4 works only with python 2.7
-
-	; Install required libraries
-	; - libxml2-dev: nice library to parse and create xml
-	
-	$ sudo apt-get install libxml2-dev
-
-	; Install other required libraries 
-	$ sudo apt-get install python-pip
-	$ sudo pip install gunicorn falcon cython requests
-
-	; Install the virtualizer library
-	; The virtualizer library has to be installed. After installing the python library, in the virtualizer_library directory 
-	; there is a README with the instructions to install this library.
-
 ## Getting the code
 
 To get the Mdo2frog4 through GIT:
@@ -39,6 +22,34 @@ To get the Mdo2frog4 through GIT:
 	$ git clone https://github.com/netgroup-polito/mdo2frog4.git
 	$ cd mdo2frog4
 	$ git submodule init && git submodule update
+
+## Required libraries
+
+Install the required libraries:
+
+	; Install required libraries
+	; - libxml2-dev: nice library to parse and create xml
+	
+	$ sudo apt-get install libxml2-dev
+
+	; Install other required libraries 
+	$ sudo apt-get install python-pip
+	; Install the virtualizer library
+	; The virtualizer library has to be installed. After installing the python library, in the virtualizer_library directory 
+	; there is a README with the instructions to install this library.
+
+The Mdo2frog4 works only with python 2.7. So if you are using an environment with multiple python running versions, you can follow this instructions first:
+	
+- You must run the mdo2frog4 in a virtualenv, so go first:
+		
+		$ cd YOUR_MDO_FOLDER
+		$ virtualenv -p /usr/bin/python2.7 .env
+		$ source .env/bin/activate
+		$ pip install gunicorn falcon cython requests
+
+Otherwise just follow this instruction:
+
+	$ sudo pip install gunicorn falcon cython requests
 	
 ## How to configure the Mdo2frog4
 
@@ -68,6 +79,13 @@ This file contains the underlying domain current view. At start time, it contain
 named above. When a NFFG is deployed succesfully, this file is updated with the new nf_instance and new flow rules.
 
 ## How to run the Mdo2frog4
+
+Remember that if you are working in an environment with multiple python running version, first type this commands:
+	
+	$ cd YOUR_MDO_FOLDER
+	$ source .env/bin/activate
+
+Now run the mdo2frog4:
 
 	$ gunicorn -b ip:port mdo2frog4:api
 
