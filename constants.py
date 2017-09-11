@@ -1,5 +1,5 @@
 #Configuration file of the virtualizer
-CONFIGURATION_FILE = 'config/configuration.ini'
+CONFIGURATION_FILE = 'config/default-config.ini'
 
 '''
 	File used by the virtualizer to maintain the state (i.e., rules deployed,

@@ -347,7 +347,7 @@ def extractVNFsInstantiated(content):
             LOG.warning("Resources are not supported inside a node element! Node: "+ instance.id.get_value())
         #the name of vnf must correspond to the type in supported_NFs
         if vnfType != "fake":
-            vnf = VNF(_id = instance.id.get_value(), name = vnfType,vnf_template_location=vnfType, ports=port_list, unify_control=unify_control, unify_env_variables=unify_env_variables)
+            vnf = VNF(_id = instance.id.get_value(), name = vnfType,functional_capability=vnfType, ports=port_list, unify_control=unify_control, unify_env_variables=unify_env_variables)
             nfinstances.append(vnf)
         else:
             fakevm = True
@@ -485,7 +485,7 @@ def extractRules(content):
             LOG.debug("port name: %s", port.name.get_value())
             e_domain = endpoints_domain[int(port_id)]
             e_vlanid = endpoints_vlanid[int(port_id)]
-            if 'of' in port.name.get_value():
+            if '/' in port.name.get_value():
                 tokens= port.name.get_value().split('/')
                 LOG.debug("node: %s", tokens[0])
                 LOG.debug("interface: %s", tokens[1])
@@ -493,7 +493,7 @@ def extractRules(content):
                 interface_t = tokens[1]
                 #check the node id to understand the correct domain where the endpoint will be deployed
                 if port_name not in endpoints_dict:
-                    LOG.debug("It's an onos_domain endpoint")
+                    LOG.debug("It's a domain endpoint")
                     endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(e_vlanid), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain=e_domain)
                     LOG.debug("%s", str(endpoints_dict[port_name]))
             else:
@@ -556,14 +556,14 @@ def extractRules(content):
             e_vlanid = endpoints_vlanid[int(port_id)]
             LOG.debug("Domain: %s - vlanid: %s", e_domain, str(e_vlanid))
             
-            if 'of' in port.name.get_value():
+            if '/' in port.name.get_value():
                 tokens= port.name.get_value().split('/')
                 LOG.debug("node: %s", tokens[0])
                 LOG.debug("interface: %s", tokens[1])
                 node_t = tokens[0]
                 interface_t = tokens[1]
                 if port_name not in endpoints_dict:
-                        LOG.debug("It's an onos_domain endpoint")
+                        LOG.debug("It's a domain endpoint")
 
                         endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=e_domain, _type="vlan",vlan_id=e_vlanid, interface=interface_t, name=port.name.get_value(), node_id=node_t)
                         LOG.debug(endpoints_dict[port_name].getDict(domain=True))
@@ -739,7 +739,6 @@ def sendToOrchestrator(rules, vnfs, endpoints):
     global corr_graphids
 
     nffg = NF_FG()
-    nffg.id = graph_id
     nffg.name = graph_name
     if unify_monitoring != "":
         nffg.unify_monitoring = unify_monitoring

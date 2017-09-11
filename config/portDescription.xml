@@ -4,22 +4,22 @@
                  xsi:noNamespaceSchemaLocation="portDescription-schema.xsd">
 
 	<ports>
-		<port name="eth1">
-			<virtualized as="of:000064e9505a8a40/5110" port-type="port-sap" sap="sap1" endpoint_domain="new_onos_domain" />
-			<vlanid>270</vlanid>
+		<port name="sdn1">
+			<virtualized as="of:000064e9505a7f18/5107" port-type="port-sap" sap="sap1" endpoint_domain="tilab_domain" />
+			<vlanid>223</vlanid>
 		</port>
-		<port name="eth2">
-			<virtualized as="of:000064e9505a7f18/5098" port-type="port-sap" sap="sap2" endpoint_domain="new_onos_domain"/>
-			<vlanid>271</vlanid>
+		<port name="sdn2">
+			<virtualized as="of:000064e9505a7f18/5098" port-type="port-sap" sap="sap2" endpoint_domain="tilab_domain"/>
+			<vlanid>223</vlanid>
 		</port>
-                <port name="eth3">
-                        <virtualized as="External_port_3" port-type="port-sap" sap="sap3" endpoint_domain="openstack"/>
-			<vlanid>270</vlanid>
-                </port>
+		<port name="163.162.234.30/eth9">
+			<virtualized as="163.162.234.30/eth9" port-type="port-sap" sap="sap3" endpoint_domain="un_tilab"/>
+			<vlanid>223</vlanid>
+		</port>
 		<!-- 
 			Values for "port-type":
 			* port-abstract
-			* port-type
+			* port-sap
 		-->	
 		
 	</ports>

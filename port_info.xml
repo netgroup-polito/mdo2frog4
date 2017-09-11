@@ -1,22 +1,22 @@
-			<name>Domain</name>
-			<type>BisBis</type>
-			<ports>
-				<port>
-					<id>1</id>
-					<name>of:000064e9505a8a40/5110</name>
-					<port_type>port-sap</port_type>
-					<sap>sap1</sap>
-				</port>
-				<port>
-					<id>2</id>
-					<name>of:000064e9505a7f18/5098</name>
-					<port_type>port-sap</port_type>
-					<sap>sap2</sap>
-				</port>
-				<port>
-					<id>3</id>
-					<name>External_port_3</name>
-					<port_type>port-sap</port_type>
-					<sap>sap3</sap>
-				</port>
-			</ports>
+<name>Domain</name>
+<type>BisBis</type>
+<ports>
+	<port>
+		<id>1</id>
+		<name>of:000064e9505a7f18/5107</name>
+		<port_type>port-sap</port_type>
+		<sap>sap1</sap>
+	</port>
+	<port>
+		<id>2</id>
+		<name>of:000064e9505a7f18/5098</name>
+		<port_type>port-sap</port_type>
+		<sap>sap2</sap>
+	</port>
+	<port>
+		<id>3</id>
+		<name>163.162.234.30/eth9</name>
+		<port_type>port-sap</port_type>
+		<sap>sap2</sap>
+	</port>
+</ports>
