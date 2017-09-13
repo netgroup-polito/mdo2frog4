@@ -3,7 +3,7 @@ from exception import ClientError, ServerError
 from collections import OrderedDict
 from requests.exceptions import HTTPError
 __author__ = 'Ivano Cerrato, Stefano Petrangeli'
-__modified_by__ = 'Francesco Lubrano'
+__modified_by__ = 'Francesco Lubrano, Davide Maraschio'
 
 import falcon
 import json
@@ -267,8 +267,9 @@ def extractVNFsInstantiated(content):
         vnfType = instance.name.get_value()
 
         port_list = []
-        #Append the first port dedicated to management vlan
-        port_list.append(Port(_id="port:"+str(0)))
+        if add_management_port is True:
+            #Append the first port dedicated to management vlan
+            port_list.append(Port(_id="port:"+str(0)))
         unify_control = []
         unify_env_variables = []
         for port_id in instance.ports.port:
@@ -306,9 +307,10 @@ def extractVNFsInstantiated(content):
                     uc = UnifyControl(vnf_tcp_port=int(int(vnf_port)), host_tcp_port=int(host_port))
                     unify_control.append(uc)
             else:
-                if int(port.id.get_value()) == 0 :
-                    LOG.error("Port with id = 0 should be present only if it has a L4 configuration on VNF of type '%s'", vnfType)
-                    raise ClientError("Port with id = 0 should be present only if it has a L4 configuration on VNF of type " + vnfType)
+                if add_management_port is True:
+                    if int(port.id.get_value()) == 0 :
+                        LOG.error("Port with id = 0 should be present only if it has a L4 configuration on VNF of type '%s'", vnfType)
+                        raise ClientError("Port with id = 0 should be present only if it has a L4 configuration on VNF of type " + vnfType)
                 unify_ip = None
                 if port.addresses.l3.length() != 0:
                     if port.addresses.l3.length() > 1:
@@ -484,7 +486,11 @@ def extractRules(content):
             port_id = findEndPointId(domain, port.name.get_value())
             LOG.debug("port name: %s", port.name.get_value())
             e_domain = endpoints_domain[int(port_id)]
-            e_vlanid = endpoints_vlanid[int(port_id)]
+            if endpoints_vlanid[int(port_id)] is not None:
+                e_vlanid = endpoints_vlanid[int(port_id)]
+            else:
+                e_vlanid = None
+
             if '/' in port.name.get_value():
                 tokens= port.name.get_value().split('/')
                 LOG.debug("node: %s", tokens[0])
@@ -495,7 +501,13 @@ def extractRules(content):
                 if port_name not in endpoints_dict:
                     LOG.debug("It's a domain endpoint")
                     endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(e_vlanid), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain=e_domain)
-                    LOG.debug("%s", str(endpoints_dict[port_name]))
+
+            elif "internal" in port.name.get_value():
+                if port_name not in endpoints_dict:
+                    LOG.debug("It's an internal endpoint")
+                    metadata = port.metadata
+                    endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="internal", internal_group=metadata['internal'].value.get_value(), domain=e_domain)
+
             else:
                 if port_name not in endpoints_dict:
                     endpoints_dict[port_name] = EndPoint(_id=str(port_id), domain=e_domain, _type="vlan",vlan_id=str(e_vlanid), interface=str(port_id),name=port.name.get_value())
@@ -567,6 +579,11 @@ def extractRules(content):
 
                         endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=e_domain, _type="vlan",vlan_id=e_vlanid, interface=interface_t, name=port.name.get_value(), node_id=node_t)
                         LOG.debug(endpoints_dict[port_name].getDict(domain=True))
+            elif "internal" in port.name.get_value():
+                if port_name not in endpoints_dict:
+                    LOG.debug("It's an internal endpoint")
+                    metadata = port.metadata
+                    endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="internal", internal_group=metadata['internal'].value.get_value(), domain=e_domain)
             else:
                     if port_name not in endpoints_dict:
                         endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=e_domain, _type="vlan",vlan_id=e_vlanid, interface=str(port_id),name=port.name.get_value())
@@ -591,9 +608,11 @@ def extractRules(content):
         #Prepare the rule
         flowrule.id = f_id
         if priority is None:
-            LOG.error("Flowrule '%s' must have a priority set", f_id)
-            raise ClientError("Flowrule "+f_id+" must have a priority set")
-        flowrule.priority = int(priority)
+            #LOG.error("Flowrule '%s' must have a priority set", f_id)
+            #raise ClientError("Flowrule "+f_id+" must have a priority set")
+            flowrule.priority = int(40005)
+        else:
+            flowrule.priority = int(priority)
         flowrule.match = match
 
         flowrules.append(flowrule)
@@ -759,12 +778,12 @@ def sendToOrchestrator(rules, vnfs, endpoints):
         if len(nffg.flow_rules) - 2 + len(nffg.vnfs) + len(nffg.end_points) <= 1:
             LOG.debug("No elements have to be sent to orchestrator...sending a delete request")
             LOG.debug("DELETE url: %s %s", graph_url, nffg.id)
-            LOG.debug("Current graph id: " + corr_graphids[nffg.id])
+            LOG.debug("Current graph id: " + corr_graphids)
 
             if debug_mode is False:
                 if authentication is True and token is None:
                     getToken()
-                url = graph_url + corr_graphids[nffg.id]
+                url = graph_url + corr_graphids
                 LOG.debug("url for delete: " + url)
                 responseFromFrog = requests.delete(url, headers=headers)
                 LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
@@ -802,8 +821,8 @@ def sendToOrchestrator(rules, vnfs, endpoints):
                     received_id = responseFromFrog.text
                     LOG.info("Graph_id = %s  Received graph_id = %s",graph_id, received_id)
                     received_id_JSON = json.loads(received_id)
-                    corr_graphids[graph_id] = received_id_JSON['nffg-uuid']
-                    LOG.info("Correspondance : %s -- %s", graph_id, corr_graphids[graph_id])
+                    corr_graphids = received_id_JSON['nffg-uuid']
+                    LOG.info("Correspondance : %s -- %s", graph_id, corr_graphids)
                 elif responseFromFrog.status_code == 401:
                     LOG.debug("Token expired, getting a new one...")
                     getToken()
@@ -892,11 +911,22 @@ def mdo2frog4Init():
     for port in ports:
         virtualized = port.find('virtualized')
         port_description = virtualized.attrib
-        vlanid = port.find('vlanid').text
-        LOG.debug("physicl name: %s - virtualized name: %s - type: %s - sap: %s - endpoint domain: %s - vlanid: %s", port.attrib['name'], port_description['as'],port_description['port-type'],port_description['sap'], port_description['endpoint_domain'], vlanid)
+        if port.find('vlanid') is not None:
+            vlanid = port.find('vlanid').text
+            LOG.debug("physicl name: %s - virtualized name: %s - type: %s - sap: %s - endpoint domain: %s - vlanid: %s", port.attrib['name'], port_description['as'],port_description['port-type'],port_description['sap'], port_description['endpoint_domain'], vlanid)
+            endpoints_vlanid[portID] = vlanid
+        
+        else:
+            #It should be an internal endpoint, or anyway it won't need the vlan id
+            LOG.debug("physicl name: %s - virtualized name: %s - type: %s - sap: %s - endpoint domain: %s", port.attrib['name'], port_description['as'],port_description['port-type'],port_description['sap'], port_description['endpoint_domain'])
+            endpoints_vlanid[portID] = None
+
         endpoints_domain[portID] = port_description['endpoint_domain']
-        endpoints_vlanid[portID] = vlanid
-        LOG.debug('Double check: d: %s , vid: %s', endpoints_domain[portID], endpoints_vlanid[portID])
+
+        if  endpoints_vlanid[portID] is not None:
+            LOG.debug('Double check: d: %s , vid: %s', endpoints_domain[portID], endpoints_vlanid[portID])
+        else:
+            LOG.debug('Check: d: %s', endpoints_domain[portID])
 
         physicalPortsVirtualization[port_description['as']] =  port.attrib['name']
 
@@ -929,11 +959,17 @@ def readConfigurationFile():
     global cpu, memory, storage
     global authentication, username, password, tenant
     global headers
+    global add_management_port
 
     LOG.info("Reading configuration file: '%s'",constants.CONFIGURATION_FILE)
     config = ConfigParser.ConfigParser()
     config.read(constants.CONFIGURATION_FILE)
     sections = config.sections()
+
+    if 'Openstack Management' not in sections:
+        add_management_port = False
+    else:
+        add_management_port = config.getboolean("Openstack Management","add_management_port")
 
     if 'connections' not in sections:
         LOG.error("Wrong file '%s'. It does not include the section 'connections' :(",constants.CONFIGURATION_FILE)
@@ -1040,6 +1076,7 @@ def adjustEscapeNffg(content):
         raise ClientError("ParseError: %s" % e.message)
 
     infrastructure = Virtualizer.parse(root=tree.getroot())
+
     domain = infrastructure.nodes.node[constants.NODE_ID]
     flowtable = domain.flowtable
     for flowentry in flowtable:
@@ -1177,7 +1214,7 @@ tenant = ""
 token = None
 headers = {}
 endpoint_vlanid = []
-corr_graphids = {}
+corr_graphids = None
 fakevm = False
 debug_mode = False
 endpoints_domain = {}
