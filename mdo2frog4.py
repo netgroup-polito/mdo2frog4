@@ -896,7 +896,7 @@ def sendToOrchestrator(rules, vnfs, endpoints):
         LOG.error("Cannot contact the orchestrator at '%s'",graph_url + nffg.id)
         raise ServerError("Cannot contact the orchestrator at "+graph_url)
         
-sendUpdateToOrchestrator((rules, vnfs, endpoints):
+def sendUpdateToOrchestrator(rules, vnfs, endpoints):
     '''
     Send rules and VNFs on the orchestrator
     '''
