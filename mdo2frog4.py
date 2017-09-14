@@ -121,8 +121,15 @@ class DoEditConfig:
             if fakevm is True:
                 fakevm = False
                 rulesToBeAdded = connectEndpoints(rulesToBeAdded)
+            
+            if len(rulesToBeAdded) - 2 + len(vnfsToBeAdded) + len(endpoints) <= 1:
+                updated = tryToUpdate(content)
+                vnfsToBeAdded = extractVNFsInstantiated(updated)    #VNF deployed/to be deployed on the controlled domain (eg. frog4 orchestrator)
+                rulesToBeAdded, endpoints = extractRules(updated)    #Flowrules and endpoints installed/to be installed on the controlled domain (eg. frog4 orchestrator)
+                sendUpdateToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
 
-            sendToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
+            else:
+                sendToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
             
             #Updates the file containing the current status of the controlled domain (eg. frog4 orchestrator), by editing the #<flowtable> and the <NF_instances> and returning the xml
             un_config = updateDomainStatus(content)
@@ -662,6 +669,52 @@ def equivalentAction(tag):
     '''
     return constants.equivalent_actions[tag]
 
+def tryToUpdate(newContent):
+
+    LOG.debug("Trying to update the domain")
+
+    LOG.debug("Reading file '%s', which contains the current status of the domain...",constants.GRAPH_XML_FILE)
+    try:
+        oldTree = ET.parse(constants.GRAPH_XML_FILE)
+    except ET.ParseError as e:
+        print('ParseError: %s' % e.message)
+        LOG.error('ParseError: %s', e.message)
+        raise ServerError("ParseError: %s" % e.message)
+    LOG.debug("File correctly read")
+
+    infrastructure = Virtualizer.parse(root=oldTree.getroot())
+    domain = infrastructure.nodes.node[constants.NODE_ID]
+    flowtable = domain.flowtable
+    nfInstances = domain.NF_instances
+
+    #LOG.debug("OLD ONE\n %s", infrastructure.xml())
+    #LOG.debug("Getting the new flowrules to be sent to the frog4 orchestrator")
+    try:
+        newTree = ET.ElementTree(ET.fromstring(newContent))
+    except ET.ParseError as e:
+        print('ParseError: %s' % e.message)
+        LOG.error('ParseError: %s', e.message)
+        raise ServerError("ParseError: %s" % e.message)
+
+    newInfrastructure = Virtualizer.parse(root=newTree.getroot())
+    tempFlowtable = newInfrastructure.nodes.node[constants.NODE_ID].flowtable
+    tempNfInstances = newInfrastructure.nodes.node[constants.NODE_ID].NF_instances
+    
+            #Update the NF instances with the new NFs
+    for instance in tempNfInstances:
+        if instance.get_operation() == 'delete':
+            nfInstances[instance.id.get_value()].delete()
+            
+    #Update the flowtable with the new flowentries
+    for flowentry in tempFlowtable:
+        if flowentry.get_operation() == 'delete':
+            flowtable[flowentry.id.get_value()].delete()
+    
+    newInfrastructure.nodes.node[constants.NODE_ID].NF_instances = nfInstances
+    newInfrastructure.nodes.node[constants.NODE_ID].flowtable = flowtable
+    
+    return newInfrastructure.xml()
+    #LOG.debug("NEW ONE\n %s", newInfrastructure.xml())
 
 def updateDomainStatus(newContent):
     '''
@@ -685,7 +738,7 @@ def updateDomainStatus(newContent):
     flowtable = domain.flowtable
     nfInstances = domain.NF_instances
 
-
+    #LOG.debug("ECCO LA VECCHIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n %s", infrastructure.xml())
     #LOG.debug("Getting the new flowrules to be sent to the frog4 orchestrator")
     try:
         newTree = ET.ElementTree(ET.fromstring(newContent))
@@ -697,6 +750,8 @@ def updateDomainStatus(newContent):
     newInfrastructure = Virtualizer.parse(root=newTree.getroot())
     newFlowtable = newInfrastructure.nodes.node[constants.NODE_ID].flowtable
     newNfInstances = newInfrastructure.nodes.node[constants.NODE_ID].NF_instances
+    
+    #LOG.debug("ECCO LA NUOVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n %s", newInfrastructure.xml())
 
     #Update the NF instances with the new NFs
     for instance in newNfInstances:
@@ -777,7 +832,7 @@ def sendToOrchestrator(rules, vnfs, endpoints):
         # note that the -2 is because mdo2frog4 inserts automatically the management endpoint for the jolnet environment
         if len(nffg.flow_rules) - 2 + len(nffg.vnfs) + len(nffg.end_points) <= 1:
             LOG.debug("No elements have to be sent to orchestrator...sending a delete request")
-            LOG.debug("DELETE url: %s %s", graph_url, nffg.id)
+            LOG.debug("DELETE url: %s %s", graph_url, corr_graphids)
             LOG.debug("Current graph id: " + corr_graphids)
 
             if debug_mode is False:
@@ -814,6 +869,97 @@ def sendToOrchestrator(rules, vnfs, endpoints):
                     getToken()
 
                 responseFromFrog = requests.post(graph_url, data=nffg.getJSON(domain=True), headers=headers)
+                LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
+
+                if responseFromFrog.status_code == 201:
+                    LOG.info("New VNFs and flows properly deployed")
+                    received_id = responseFromFrog.text
+                    LOG.info("Graph_id = %s  Received graph_id = %s",graph_id, received_id)
+                    received_id_JSON = json.loads(received_id)
+                    corr_graphids = received_id_JSON['nffg-uuid']
+                    LOG.info("Correspondance : %s -- %s", graph_id, corr_graphids)
+                elif responseFromFrog.status_code == 401:
+                    LOG.debug("Token expired, getting a new one...")
+                    getToken()
+                    newresponseFromFrog = requests.put(graph_url, data=nffg.getJSON(), headers=headers)
+                    LOG.debug("Status code received from the orchestrator: %s",newresponseFromFrog.status_code)
+                    if newresponseFromFrog.status_code == 201:
+                        LOG.info("New VNFs and flows properly deployed on the orchestrator")
+                    else:
+                        LOG.error("Something went wrong while deploying the new VNFs and flows on orchestrator")
+                        raise ServerError("Something went wrong while deploying the new VNFs and flows on the orchestrator")
+                else:
+                    LOG.error("Something went wrong while deploying the new VNFs and flows on the orchestrator")
+                    raise ServerError("Something went wrong while deploying the new VNFs and flows on the orchestrator")
+
+    except (requests.ConnectionError):
+        LOG.error("Cannot contact the orchestrator at '%s'",graph_url + nffg.id)
+        raise ServerError("Cannot contact the orchestrator at "+graph_url)
+        
+sendUpdateToOrchestrator((rules, vnfs, endpoints):
+    '''
+    Send rules and VNFs on the orchestrator
+    '''
+    LOG.info("Sending the new graph to the orchestrator (%s)",OrchestratorURL)
+    global corr_graphids
+
+    nffg = NF_FG()
+    nffg.name = graph_name
+    if unify_monitoring != "":
+        nffg.unify_monitoring = unify_monitoring
+    nffg.flow_rules = rules
+    nffg.vnfs = vnfs
+    nffg.end_points = endpoints
+
+    #Delete endpoints that are not involved in any flowrule
+    for endpoint in nffg.end_points[:]:
+        if not nffg.getFlowRulesSendingTrafficToEndPoint(endpoint.id) and not nffg.getFlowRulesSendingTrafficFromEndPoint(endpoint.id):
+            nffg.end_points.remove(endpoint)
+
+    graph_url = OrchestratorURL + "/NF-FG/"
+
+    try:
+        # if the nffg translated in the nffg_library version has no flowrules, no vnfs and no endpoints, it's a delete request
+        # note that the -2 is because mdo2frog4 inserts automatically the management endpoint for the jolnet environment
+        if len(nffg.flow_rules) - 2 + len(nffg.vnfs) + len(nffg.end_points) <= 1:
+            LOG.debug("No elements have to be sent to orchestrator...sending a delete request")
+            LOG.debug("DELETE url: %s %s", graph_url, corr_graphids)
+            LOG.debug("Current graph id: " + corr_graphids)
+
+            if debug_mode is False:
+                if authentication is True and token is None:
+                    getToken()
+                url = graph_url + corr_graphids
+                LOG.debug("url for delete: " + url)
+                responseFromFrog = requests.delete(url, headers=headers)
+                LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
+                if responseFromFrog.status_code == 200:
+                    LOG.info("Graph successfully deleted")
+                elif responseFromFrog.status_code == 401 or responseFromFrog.status_code == 404:
+                    LOG.info("Graph successfully deleted") #TODO: da aggiornare con l'id del grafo restituito dalla put
+                    #LOG.debug("Token expired, getting a new one...")
+                    #getToken()
+                    #newresponseFromFrog = requests.delete(url, headers=headers)
+                    #LOG.debug("Status code received from the Frog orchestrator: %s",newresponseFromFrog.status_code)
+                    #if newresponseFromFrog.status_code == 200:
+                    #    LOG.info("Graph successfully deleted")
+                    #else:
+                    #    LOG.error("Something went wrong while deleting the graph on the Frog4 orchestrator")
+                    #    raise ServerError("Something went wrong while deleting the graph on the Frog4 orchestrator")
+                else:
+                    LOG.error("Something went wrong while deleting the graph on the orchestrator")
+                    raise ServerError("Something went wrong while deleting the graph on the orchestrator")
+        else:
+            LOG.debug("Graph that is going to be sent to the orchestrator:")
+            LOG.debug("%s",nffg.getJSON(domain=True))
+            LOG.debug("PUT url: "+ graph_url + corr_graphids)
+
+            if debug_mode is False:
+
+                if authentication is True and token is None:
+                    getToken()
+
+                responseFromFrog = requests.put(graph_url, data=nffg.getJSON(domain=True), headers=headers)
                 LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
 
                 if responseFromFrog.status_code == 201:
@@ -1214,7 +1360,7 @@ tenant = ""
 token = None
 headers = {}
 endpoint_vlanid = []
-corr_graphids = None
+corr_graphids = "1234"
 fakevm = False
 debug_mode = False
 endpoints_domain = {}
