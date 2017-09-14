@@ -842,9 +842,17 @@ def sendToOrchestrator(rules, vnfs, endpoints):
                 LOG.debug("url for delete: " + url)
                 responseFromFrog = requests.delete(url, headers=headers)
                 LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
-                if responseFromFrog.status_code == 200:
+                if responseFromFrog.status_code == 200 or responseFromFrog.status_code == 204:
                     LOG.info("Graph successfully deleted")
                 elif responseFromFrog.status_code == 401 or responseFromFrog.status_code == 404:
+                    getToken()
+                    responseFromFrog = requests.delete(url, headers=headers)
+                    LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
+                    if responseFromFrog.status_code == 200 or responseFromFrog.status_code == 204:
+                        LOG.info("Graph successfully deleted") #TODO: da aggiornare con l'id del grafo restituito dalla put
+                    else:
+                        LOG.error("Something went wrong while deleting the graph on the orchestrator")
+                        raise ServerError("Something went wrong while deleting the graph on the orchestrator")
                     LOG.info("Graph successfully deleted") #TODO: da aggiornare con l'id del grafo restituito dalla put
                     #LOG.debug("Token expired, getting a new one...")
                     #getToken()
@@ -881,7 +889,7 @@ def sendToOrchestrator(rules, vnfs, endpoints):
                 elif responseFromFrog.status_code == 401:
                     LOG.debug("Token expired, getting a new one...")
                     getToken()
-                    newresponseFromFrog = requests.put(graph_url, data=nffg.getJSON(), headers=headers)
+                    newresponseFromFrog = requests.post(graph_url, data=nffg.getJSON(), headers=headers)
                     LOG.debug("Status code received from the orchestrator: %s",newresponseFromFrog.status_code)
                     if newresponseFromFrog.status_code == 201:
                         LOG.info("New VNFs and flows properly deployed on the orchestrator")
@@ -916,27 +924,34 @@ def sendUpdateToOrchestrator(rules, vnfs, endpoints):
         if not nffg.getFlowRulesSendingTrafficToEndPoint(endpoint.id) and not nffg.getFlowRulesSendingTrafficFromEndPoint(endpoint.id):
             nffg.end_points.remove(endpoint)
 
-    graph_url = OrchestratorURL + "/NF-FG/"
+    graph_url = OrchestratorURL + "/NF-FG/" + corr_graphids
 
     try:
         # if the nffg translated in the nffg_library version has no flowrules, no vnfs and no endpoints, it's a delete request
         # note that the -2 is because mdo2frog4 inserts automatically the management endpoint for the jolnet environment
         if len(nffg.flow_rules) - 2 + len(nffg.vnfs) + len(nffg.end_points) <= 1:
             LOG.debug("No elements have to be sent to orchestrator...sending a delete request")
-            LOG.debug("DELETE url: %s %s", graph_url, corr_graphids)
+            LOG.debug("DELETE url: %s", graph_url)
             LOG.debug("Current graph id: " + corr_graphids)
 
             if debug_mode is False:
                 if authentication is True and token is None:
                     getToken()
-                url = graph_url + corr_graphids
+                url = graph_url
                 LOG.debug("url for delete: " + url)
                 responseFromFrog = requests.delete(url, headers=headers)
                 LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
-                if responseFromFrog.status_code == 200:
+                if responseFromFrog.status_code == 200 or responseFromFrog.status_code == 204:
                     LOG.info("Graph successfully deleted")
                 elif responseFromFrog.status_code == 401 or responseFromFrog.status_code == 404:
-                    LOG.info("Graph successfully deleted") #TODO: da aggiornare con l'id del grafo restituito dalla put
+                    getToken()
+                    responseFromFrog = requests.delete(url, headers=headers)
+                    LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
+                    if responseFromFrog.status_code == 200 or responseFromFrog.status_code == 204:
+                        LOG.info("Graph successfully deleted") #TODO: da aggiornare con l'id del grafo restituito dalla put
+                    else:
+                        LOG.error("Something went wrong while deleting the graph on the orchestrator")
+                        raise ServerError("Something went wrong while deleting the graph on the orchestrator")
                     #LOG.debug("Token expired, getting a new one...")
                     #getToken()
                     #newresponseFromFrog = requests.delete(url, headers=headers)
@@ -952,7 +967,7 @@ def sendUpdateToOrchestrator(rules, vnfs, endpoints):
         else:
             LOG.debug("Graph that is going to be sent to the orchestrator:")
             LOG.debug("%s",nffg.getJSON(domain=True))
-            LOG.debug("PUT url: "+ graph_url + corr_graphids)
+            LOG.debug("PUT url: "+ graph_url)
 
             if debug_mode is False:
 
@@ -962,20 +977,17 @@ def sendUpdateToOrchestrator(rules, vnfs, endpoints):
                 responseFromFrog = requests.put(graph_url, data=nffg.getJSON(domain=True), headers=headers)
                 LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
 
-                if responseFromFrog.status_code == 201:
-                    LOG.info("New VNFs and flows properly deployed")
+                if responseFromFrog.status_code == 202:
+                    LOG.info("New VNFs and flows properly updated")
                     received_id = responseFromFrog.text
-                    LOG.info("Graph_id = %s  Received graph_id = %s",graph_id, received_id)
-                    received_id_JSON = json.loads(received_id)
-                    corr_graphids = received_id_JSON['nffg-uuid']
-                    LOG.info("Correspondance : %s -- %s", graph_id, corr_graphids)
+                    LOG.info("Graph_id = %s  successfully updated",corr_graphids)
                 elif responseFromFrog.status_code == 401:
                     LOG.debug("Token expired, getting a new one...")
                     getToken()
                     newresponseFromFrog = requests.put(graph_url, data=nffg.getJSON(), headers=headers)
                     LOG.debug("Status code received from the orchestrator: %s",newresponseFromFrog.status_code)
-                    if newresponseFromFrog.status_code == 201:
-                        LOG.info("New VNFs and flows properly deployed on the orchestrator")
+                    if newresponseFromFrog.status_code == 202:
+                        LOG.info("New VNFs and flows properly updated on the orchestrator")
                     else:
                         LOG.error("Something went wrong while deploying the new VNFs and flows on orchestrator")
                         raise ServerError("Something went wrong while deploying the new VNFs and flows on the orchestrator")
