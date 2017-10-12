@@ -14,7 +14,7 @@ import re
 import os
 
 import constants
-from virtualizer_library.virtualizer import ET, Virtualizer,  Software_resource, Infra_node, Port as Virt_Port
+from virtualizer_library.virtualizer import ET, Virtualizer,  Software_resource, Infra_node,PortSap_data, Port as Virt_Port
 from nffg_library.nffg import NF_FG, VNF, Match, Action, EndPoint, FlowRule, Port, UnifyControl
 
 class DoPing:
@@ -386,7 +386,7 @@ def manageVNFs(instance):
             
 def setBandwidth(value):
     headers = {'Content-Type': 'application/json'}
-    service_layer_url = "http://163.162.235.19:8585/mef/bandwidth/" + value
+    service_layer_url = "http://163.162.234.30:8585/mef/bandwidth/" + value
     resp = requests.post(service_layer_url, headers=headers)
     LOG.info("Service Layer response: " + str(resp.status_code))
 
@@ -1138,6 +1138,10 @@ def mdo2frog4Init():
         physicalPortsVirtualization[port_description['as']] =  port.attrib['name']
 
         portObject = Virt_Port(id=str(portID), name=port_description['as'], port_type=port_description['port-type'], sap=port_description['sap'])
+        if port.find('sap_data') is not None:
+            delay = port.find('sap_data').find('resources').find('delay').text
+            if delay is not None:
+                portObject.sap_data.resources.delay.set_value(delay)
         domain.ports.add(portObject)
         portID = portID + 1
 
@@ -1323,8 +1327,8 @@ def loadTemplates():
         with open(constants.GRAPH_XML_FILE, 'r') as infile:
             rowIter = iter(infile)
             for row in rowIter:
-                if row.lstrip(' \t').startswith('</resources>'):
-                    outfile.write("\t\t\t</resources>\n")
+                if row.lstrip(' \t').startswith('</ports>'):
+                    outfile.write("\t\t\t</ports>\n")
                     outfile.write("\t\t\t<capabilities>\n")
                     outfile.write("\t\t\t\t<supported_NFs>\n")
                     with open("template.xml", 'r') as template:

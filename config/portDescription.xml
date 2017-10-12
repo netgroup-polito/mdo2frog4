@@ -10,6 +10,13 @@
 		</port>
 		<port name="customer_tilab">
 			<virtualized as="163.162.234.30/eth8" port-type="port-sap" sap="sap1" endpoint_domain="un_tilab" />
+		<!--
+		    <sap_data>
+			    <resources>
+				    <delay>1 ms </delay>
+			    </resources>
+		    </sap_data>
+		-->
 		</port>
 		<!-- 
 			Values for "port-type":
