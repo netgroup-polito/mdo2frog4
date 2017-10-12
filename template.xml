@@ -13,21 +13,9 @@
 			<name>to_traffic_shaper</name>
 			<port_type>port-abstract</port_type>
 		</port>
-	</ports>
-</node>
-<node>
-	<id>2</id>
-	<name>iperf_server</name>
-	<type>iperf_server</type>
-	<ports>
 		<port>
-			<id>0</id>
-			<name>management</name>
-			<port_type>port-abstract</port_type>
-		</port>
-		<port>
-			<id>1</id>
-			<name>to_traffic_shaper</name>
+			<id>2</id>
+			<name>to_customer_fake</name>
 			<port_type>port-abstract</port_type>
 		</port>
 	</ports>
@@ -39,34 +27,17 @@
 	<ports>
 		<port>
 			<id>0</id>
+			<name>management</name>
+			<port_type>port-abstract</port_type>
+		</port>
+		<port>
+			<id>1</id>
 			<name>to_iperf</name>
-			<port_type>port-abstract</port_type>
-		</port>
-		<port>
-			<id>1</id>
-			<name>to_onos_domain</name>
-			<port_type>port-abstract</port_type>
-		</port>
-	</ports>
-</node>switch_docker
-<node>
-	<id>4</id>
-	<name>switch_docker</name>
-	<type>switch_docker</type>
-	<ports>
-		<port>
-			<id>0</id>
-			<name>to_internal</name>
-			<port_type>port-abstract</port_type>
-		</port>
-		<port>
-			<id>1</id>
-			<name>to_traffic_shaper</name>
 			<port_type>port-abstract</port_type>
 		</port>
 		<port>
 			<id>2</id>
-			<name>to_iperf</name>
+			<name>to_onos_domain</name>
 			<port_type>port-abstract</port_type>
 		</port>
 	</ports>

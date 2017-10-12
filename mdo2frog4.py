@@ -122,15 +122,15 @@ class DoEditConfig:
                 fakevm = False
                 rulesToBeAdded = connectEndpoints(rulesToBeAdded)
             
-            if len(rulesToBeAdded) - 2 + len(vnfsToBeAdded) + len(endpoints) <= 1:
+            if corr_graphids is not None:
                 updated = tryToUpdate(content)
                 vnfsToBeAdded = extractVNFsInstantiated(updated)    #VNF deployed/to be deployed on the controlled domain (eg. frog4 orchestrator)
                 rulesToBeAdded, endpoints = extractRules(updated)    #Flowrules and endpoints installed/to be installed on the controlled domain (eg. frog4 orchestrator)
-                sendUpdateToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
-
+                resp_update = sendUpdateToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
+                if resp_update == 404:
+                    sendToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
             else:
                 sendToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
-            
             #Updates the file containing the current status of the controlled domain (eg. frog4 orchestrator), by editing the #<flowtable> and the <NF_instances> and returning the xml
             un_config = updateDomainStatus(content)
 
@@ -229,6 +229,8 @@ def extractVNFsInstantiated(content):
 
     tmpInfrastructure = Virtualizer.parse(root=tree.getroot())
     supportedNFs = tmpInfrastructure.nodes.node[constants.NODE_ID].capabilities.supported_NFs
+    alreadyInstantiatedNFs = tmpInfrastructure.nodes.node[constants.NODE_ID].NF_instances
+    
     supportedTypes = []
     #lowerPortId = {}
     for nf in supportedNFs:
@@ -252,117 +254,141 @@ def extractVNFsInstantiated(content):
     nfinstances = []
 
     LOG.debug("Considering instances:")
-    LOG.debug("'%s'",infrastructure.xml())
+    LOG.debug("%s", infrastructure.xml())
+    LOG.debug("%s", tmpInfrastructure.xml())
+    
+    if instances is None:
+        LOG.warning("Update of VNF is not supported by the UN! vnf: {0}".format(instance.id.get_value()))
+        LOG.warning("This VNF will be disregarded by the Orchestrator if it already exists, or created if it does not exist")
+        
+    for instance in alreadyInstantiatedNFs:
+        vnf = manageVNFs(instance)
+        if vnf is None:
+            continue
+        else:
+            nfinstances.append(vnf)
 
     for instance in instances:
-        if instance.get_operation() is None:
-            LOG.warning("Update of VNF is not supported by the UN! vnf: {0}".format(instance.id.get_value()))
-            LOG.warning("This VNF will be disregarded by the Orchestrator if it already exists, or created if it does not exist")
-
-            #LOG.error("Update of VNF is not supported by the UN! vnf: " + instance.id.get_value())
-            #LOG.error("If you want to create a new instance please set \"operation=create\" to the node element")
-            #raise ClientError("Update of VNF is not supported by the UN! vnf: "+instance.id.get_value())
-
-        elif instance.get_operation() == 'delete':
-            graph_id=instance.id.get_value()
+        vnf = manageVNFs(instance)
+        if vnf is None:
             continue
-
-        elif instance.get_operation() != 'create':
-            LOG.error("Unsupported operation for vnf: " + instance.id.get_value())
-            raise ClientError("Unsupported operation for vnf: "+instance.id.get_value())
-        graph_id=instance.id.get_value()
-        vnfType = instance.name.get_value()
-
-        port_list = []
-        if add_management_port is True:
-            #Append the first port dedicated to management vlan
-            port_list.append(Port(_id="port:"+str(0)))
-        unify_control = []
-        unify_env_variables = []
-        for port_id in instance.ports.port:
-            port = instance.ports[port_id]
-            l4_addresses = port.addresses.l4.get_value()
-            # only process l4 address for new VNFs to be created
-            if l4_addresses is not None and instance.get_operation() == 'create':
-                if int(port.id.get_value()) != 0:
-                    LOG.error("L4 configuration is supported only to the port with id = 0 on VNF of type '%s'", vnfType)
-                    raise ClientError("L4 configuration is supported only to the port with id = 0 on VNF of type " + vnfType)
-                # find all the l4_addresses with regular expression and reformat to request notation "{protocol/port,}"
-                # l4_address format can be "protocol/port: (ip, port)" when sending back a existing vnf
-                l4_addresses_list = re.findall("('[a-z]*\/\d*')", l4_addresses)
-                s= ","
-                l4_addresses = s.join(l4_addresses_list)
-                # Removing not needed chars
-                for ch in ['{','}',' ',"'"]:
-                    if ch in l4_addresses:
-                        l4_addresses=l4_addresses.replace(ch,"")
-                LOG.debug("l4 adresses: %s", l4_addresses)
-                for l4_address in l4_addresses.split(","):
-                    tmp = l4_address.split("/")
-                    if tmp[0] != "tcp":
-                        LOG.error("Only tcp ports are supported on L4 configuration of VNF of type '%s'", vnfType)
-                        raise ClientError("Only tcp ports are supported on L4 configuration of VNF of type "+ vnfType)
-                    l4_port = tmp[1]
-                    uc = UnifyControl(vnf_tcp_port=int(l4_port), host_tcp_port=tcp_port)
-                    unify_port_mapping[instance.id.get_value() + ":" + port_id + "/" + l4_address] = (OrchestratorIP, tcp_port)
-                    unify_control.append(uc)
-                    tcp_port = tcp_port + 1
-            # just copy the existing l4 addresses
-            elif l4_addresses is not None and instance.get_operation() is None:
-                l4_addresses_list = re.findall("'[a-z]*\/(\d*)'\s*:\s*\('[0-9.]*', (\d*)\)", l4_addresses)
-                for vnf_port, host_port in l4_addresses_list:
-                    uc = UnifyControl(vnf_tcp_port=int(int(vnf_port)), host_tcp_port=int(host_port))
-                    unify_control.append(uc)
-            else:
-                if add_management_port is True:
-                    if int(port.id.get_value()) == 0 :
-                        LOG.error("Port with id = 0 should be present only if it has a L4 configuration on VNF of type '%s'", vnfType)
-                        raise ClientError("Port with id = 0 should be present only if it has a L4 configuration on VNF of type " + vnfType)
-                unify_ip = None
-                if port.addresses.l3.length() != 0:
-                    if port.addresses.l3.length() > 1:
-                        LOG.error("Only one l3 address is supported on a port on VNF of type '%s'", vnfType)
-                        raise ClientError("Only one l3 address is supported on a port on VNF of type " + vnfType)
-                    for l3_address_id in port.addresses.l3:
-                        l3_address = port.addresses.l3[l3_address_id]
-                        """
-                        if l3_address.configure.get_value() == "False" or l3_address.configure.get_value() == "false":
-                            LOG.error("Configure must be set to True on l3 address of VNF of type '%s'", vnfType)
-                            raise ClientError("Configure must be set to True on l3 address of VNF of type " + vnfType)
-                        """
-                        unify_ip = l3_address.requested.get_as_text()
-
-                mac = port.addresses.l2.get_value()
-                port_id_nffg = int(port_id)
-                port_list.append(Port(_id="port:"+str(port_id_nffg), unify_ip=unify_ip, mac=mac))
-            if port.control.orchestrator.get_as_text() is not None:
-                unify_env_variables.append("CFOR="+port.control.orchestrator.get_as_text())
-            if port.metadata.length() > 0:
-                LOG.error("Metadata are not supported inside a port element. Those should specified per node")
-        if instance.metadata.length() > 0:
-            for metadata_id in instance.metadata:
-                metadata = instance.metadata[metadata_id]
-                key = metadata.key.get_as_text()
-                value = metadata.value.get_as_text()
-                if key.startswith("variable:"):
-                    tmp = key.split(":",1)
-                    unify_env_variables.append(tmp[1]+"="+value)
-                elif key.startswith("measure"):
-                    unify_monitoring = unify_monitoring + " " + value
-                else:
-                    LOG.error("Unsupported metadata " + key)
-                    raise ClientError("Unsupported metadata " + key)
-        if instance.resources.cpu.data is not None or instance.resources.mem.data is not None or instance.resources.storage.data is not None:
-            LOG.warning("Resources are not supported inside a node element! Node: "+ instance.id.get_value())
-        #the name of vnf must correspond to the type in supported_NFs
-        if vnfType != "fake":
-            vnf = VNF(_id = instance.id.get_value(), name = vnfType,functional_capability=vnfType, ports=port_list, unify_control=unify_control, unify_env_variables=unify_env_variables)
-            nfinstances.append(vnf)
         else:
-            fakevm = True
-        LOG.debug("Required VNF: '%s'",vnfType)
+            nfinstances.append(vnf)
 
     return nfinstances
+
+def manageVNFs(instance):
+    
+    if instance.get_operation() == 'delete':
+        graph_id=instance.id.get_value()
+        return None
+
+    graph_id=instance.id.get_value()
+    vnfType = instance.name.get_value()
+
+    port_list = []
+    if add_management_port is True:
+        #Append the first port dedicated to management vlan
+        port_list.append(Port(_id="port:"+str(0)))
+    unify_control = []
+    unify_env_variables = []
+    for port_id in instance.ports.port:
+        port = instance.ports[port_id]
+        l4_addresses = port.addresses.l4.get_value()
+        # only process l4 address for new VNFs to be created
+        if l4_addresses is not None and instance.get_operation() == 'create':
+            if int(port.id.get_value()) != 0:
+                LOG.error("L4 configuration is supported only to the port with id = 0 on VNF of type '%s'", vnfType)
+                raise ClientError("L4 configuration is supported only to the port with id = 0 on VNF of type " + vnfType)
+            # find all the l4_addresses with regular expression and reformat to request notation "{protocol/port,}"
+            # l4_address format can be "protocol/port: (ip, port)" when sending back a existing vnf
+            l4_addresses_list = re.findall("('[a-z]*\/\d*')", l4_addresses)
+            s= ","
+            l4_addresses = s.join(l4_addresses_list)
+            # Removing not needed chars
+            for ch in ['{','}',' ',"'"]:
+                if ch in l4_addresses:
+                    l4_addresses=l4_addresses.replace(ch,"")
+            LOG.debug("l4 adresses: %s", l4_addresses)
+            for l4_address in l4_addresses.split(","):
+                tmp = l4_address.split("/")
+                if tmp[0] != "tcp":
+                    LOG.error("Only tcp ports are supported on L4 configuration of VNF of type '%s'", vnfType)
+                    raise ClientError("Only tcp ports are supported on L4 configuration of VNF of type "+ vnfType)
+                l4_port = tmp[1]
+                uc = UnifyControl(vnf_tcp_port=int(l4_port), host_tcp_port=tcp_port)
+                unify_port_mapping[instance.id.get_value() + ":" + port_id + "/" + l4_address] = (OrchestratorIP, tcp_port)
+                unify_control.append(uc)
+                tcp_port = tcp_port + 1
+        # just copy the existing l4 addresses
+        elif l4_addresses is not None and instance.get_operation() is None:
+            l4_addresses_list = re.findall("'[a-z]*\/(\d*)'\s*:\s*\('[0-9.]*', (\d*)\)", l4_addresses)
+            for vnf_port, host_port in l4_addresses_list:
+                uc = UnifyControl(vnf_tcp_port=int(int(vnf_port)), host_tcp_port=int(host_port))
+                unify_control.append(uc)
+        else:
+            if add_management_port is True:
+                if int(port.id.get_value()) == 0 :
+                    LOG.error("Port with id = 0 should be present only if it has a L4 configuration on VNF of type '%s'", vnfType)
+                    raise ClientError("Port with id = 0 should be present only if it has a L4 configuration on VNF of type " + vnfType)
+            unify_ip = None
+            if port.addresses.l3.length() != 0:
+                if port.addresses.l3.length() > 1:
+                    LOG.error("Only one l3 address is supported on a port on VNF of type '%s'", vnfType)
+                    raise ClientError("Only one l3 address is supported on a port on VNF of type " + vnfType)
+                for l3_address_id in port.addresses.l3:
+                    l3_address = port.addresses.l3[l3_address_id]
+                    """
+                    if l3_address.configure.get_value() == "False" or l3_address.configure.get_value() == "false":
+                        LOG.error("Configure must be set to True on l3 address of VNF of type '%s'", vnfType)
+                        raise ClientError("Configure must be set to True on l3 address of VNF of type " + vnfType)
+                    """
+                    unify_ip = l3_address.requested.get_as_text()
+
+            mac = port.addresses.l2.get_value()
+            port_id_nffg = int(port_id)
+            port_list.append(Port(_id="port:"+str(port_id_nffg), unify_ip=unify_ip, mac=mac))
+        if port.control.orchestrator.get_as_text() is not None:
+            unify_env_variables.append("CFOR="+port.control.orchestrator.get_as_text())
+        if port.metadata.length() > 0:
+            LOG.error("Metadata are not supported inside a port element. Those should specified per node")
+            for metadata_id in port.metadata:
+                metadata = port.metadata[metadata_id]
+                key = metadata.key.get_as_text()
+                value = metadata.value.get_as_text()
+                LOG.info("Metadataaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: " + key + "    " + value)
+                setBandwidth(value)
+    if instance.metadata.length() > 0:
+        for metadata_id in instance.metadata:
+            metadata = instance.metadata[metadata_id]
+            key = metadata.key.get_as_text()
+            value = metadata.value.get_as_text()
+            if key.startswith("variable:"):
+                tmp = key.split(":",1)
+                unify_env_variables.append(tmp[1]+"="+value)
+            elif key.startswith("measure"):
+                unify_monitoring = unify_monitoring + " " + value
+            else:
+                LOG.error("Unsupported metadata " + key)
+                raise ClientError("Unsupported metadata " + key)
+    if instance.resources.cpu.data is not None or instance.resources.mem.data is not None or instance.resources.storage.data is not None:
+        LOG.warning("Resources are not supported inside a node element! Node: "+ instance.id.get_value())
+    #the name of vnf must correspond to the type in supported_NFs
+    if vnfType != "fake":
+        vnf = VNF(_id = instance.id.get_value(), name = vnfType,functional_capability=vnfType, ports=port_list, unify_control=unify_control, unify_env_variables=unify_env_variables)
+        LOG.debug("Required VNF: '%s'",vnfType)
+        return vnf
+    else:
+        fakevm = True
+        LOG.debug("Required VNF: '%s'",vnfType)
+    return None
+
+            
+def setBandwidth(value):
+    headers = {'Content-Type': 'application/json'}
+    service_layer_url = "http://163.162.235.19:8585/mef/bandwidth/" + value
+    resp = requests.post(service_layer_url, headers=headers)
+    LOG.info("Service Layer response: " + str(resp.status_code))
 
 def findEndPointId(domain, endpoint_name):
     endpoints = domain.ports
@@ -382,6 +408,17 @@ def extractRules(content):
     LOG.debug("Extracting the flowrules to be installed in the controlled domain (eg. frog4 orchestrator)")
 
     try:
+        tree = ET.parse(constants.GRAPH_XML_FILE)
+    except ET.ParseError as e:
+        print('ParseError: %s' % e.message)
+        LOG.error('ParseError: %s', e.message)
+        raise ServerError("ParseError: %s" % e.message)
+        
+    tmpInfrastructure = Virtualizer.parse(root=tree.getroot())
+    supportedNFs = tmpInfrastructure.nodes.node[constants.NODE_ID].capabilities.supported_NFs
+    alreadyInstantiatedNFs = tmpInfrastructure.nodes.node[constants.NODE_ID].NF_instances
+
+    try:
         tree = ET.ElementTree(ET.fromstring(content))
     except ET.ParseError as e:
         print('ParseError: %s' % e.message)
@@ -390,6 +427,10 @@ def extractRules(content):
 
     infrastructure = Virtualizer.parse(root=tree.getroot())
     domain = infrastructure.nodes.node[constants.NODE_ID]
+    
+    for vnf in alreadyInstantiatedNFs:
+        domain.NF_instances.add(vnf)
+    
     flowtable = domain.flowtable
     instances = domain.NF_instances
     for instance in instances :
@@ -507,7 +548,10 @@ def extractRules(content):
                 #check the node id to understand the correct domain where the endpoint will be deployed
                 if port_name not in endpoints_dict:
                     LOG.debug("It's a domain endpoint")
-                    endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(e_vlanid), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain=e_domain)
+                    if e_vlanid is not None:
+                        endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="vlan",vlan_id=str(e_vlanid), interface=interface_t,name=port.name.get_value(), node_id=node_t, domain=e_domain)
+                    else:
+                        endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="interface",node_id=node_t, interface=interface_t,name=port.name.get_value(), domain=e_domain)
 
             elif "internal" in port.name.get_value():
                 if port_name not in endpoints_dict:
@@ -584,7 +628,10 @@ def extractRules(content):
                 if port_name not in endpoints_dict:
                         LOG.debug("It's a domain endpoint")
 
-                        endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=e_domain, _type="vlan",vlan_id=e_vlanid, interface=interface_t, name=port.name.get_value(), node_id=node_t)
+                        if e_vlanid is not None:
+                            endpoints_dict[port_name] = EndPoint(_id=str(port_id),domain=e_domain, _type="vlan",vlan_id=e_vlanid, interface=interface_t, name=port.name.get_value(), node_id=node_t)
+                        else:
+                            endpoints_dict[port_name] = EndPoint(_id=str(port_id), _type="interface",node_id=node_t, interface=interface_t,name=port.name.get_value(), domain=e_domain)
                         LOG.debug(endpoints_dict[port_name].getDict(domain=True))
             elif "internal" in port.name.get_value():
                 if port_name not in endpoints_dict:
@@ -830,10 +877,10 @@ def sendToOrchestrator(rules, vnfs, endpoints):
     try:
         # if the nffg translated in the nffg_library version has no flowrules, no vnfs and no endpoints, it's a delete request
         # note that the -2 is because mdo2frog4 inserts automatically the management endpoint for the jolnet environment
-        if len(nffg.flow_rules) - 2 + len(nffg.vnfs) + len(nffg.end_points) <= 1:
+        if len(nffg.flow_rules) + len(nffg.vnfs) + len(nffg.end_points) < 1:
             LOG.debug("No elements have to be sent to orchestrator...sending a delete request")
             LOG.debug("DELETE url: %s %s", graph_url, corr_graphids)
-            LOG.debug("Current graph id: " + corr_graphids)
+            LOG.debug("Current graph id: " + str(corr_graphids))
 
             if debug_mode is False:
                 if authentication is True and token is None:
@@ -908,7 +955,7 @@ def sendUpdateToOrchestrator(rules, vnfs, endpoints):
     '''
     Send rules and VNFs on the orchestrator
     '''
-    LOG.info("Sending the new graph to the orchestrator (%s)",OrchestratorURL)
+    LOG.info("Sending the updated graph to the orchestrator (%s)",OrchestratorURL)
     global corr_graphids
 
     nffg = NF_FG()
@@ -929,10 +976,10 @@ def sendUpdateToOrchestrator(rules, vnfs, endpoints):
     try:
         # if the nffg translated in the nffg_library version has no flowrules, no vnfs and no endpoints, it's a delete request
         # note that the -2 is because mdo2frog4 inserts automatically the management endpoint for the jolnet environment
-        if len(nffg.flow_rules) - 2 + len(nffg.vnfs) + len(nffg.end_points) <= 1:
+        if len(nffg.flow_rules) + len(nffg.vnfs) + len(nffg.end_points) < 1:
             LOG.debug("No elements have to be sent to orchestrator...sending a delete request")
             LOG.debug("DELETE url: %s", graph_url)
-            LOG.debug("Current graph id: " + corr_graphids)
+            LOG.debug("Current graph id: " + str(corr_graphids))
 
             if debug_mode is False:
                 if authentication is True and token is None:
@@ -991,6 +1038,8 @@ def sendUpdateToOrchestrator(rules, vnfs, endpoints):
                     else:
                         LOG.error("Something went wrong while deploying the new VNFs and flows on orchestrator")
                         raise ServerError("Something went wrong while deploying the new VNFs and flows on the orchestrator")
+                elif responseFromFrog.status_code == 404:
+                    return responseFromFrog.status_code
                 else:
                     LOG.error("Something went wrong while deploying the new VNFs and flows on the orchestrator")
                     raise ServerError("Something went wrong while deploying the new VNFs and flows on the orchestrator")
@@ -1216,7 +1265,7 @@ def adjustEscapeNffg(content):
             rowIter = iter(infile_nffg)
             for row in rowIter:
                 outfile.write("%s" % row)
-                if row.lstrip(' \t').startswith('<id>UUID11'):
+                if row.lstrip(' \t').startswith('<id>'+str(constants.NODE_ID)):
                     with open("port_info.xml", 'r') as infile:
                         rowIter1= iter(infile)
                         for row1 in rowIter1:
@@ -1372,7 +1421,7 @@ tenant = ""
 token = None
 headers = {}
 endpoint_vlanid = []
-corr_graphids = "1234"
+corr_graphids = None
 fakevm = False
 debug_mode = False
 endpoints_domain = {}

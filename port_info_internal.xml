@@ -5,12 +5,16 @@
 		<id>1</id>
 		<name>of:000064e9505a8a40/5108</name>
 		<port_type>port-sap</port_type>
-		<sap>sap7</sap>
+		<sap>sap1</sap>
 	</port>
 	<port>
 		<id>2</id>
-		<name>163.162.234.30/eth8</name>
+		<name>internal_management</name>
 		<port_type>port-sap</port_type>
-		<sap>sap1</sap>
+		<sap>sap2</sap>
+         <metadata>
+            <key>internal</key>
+            <value>1</value>
+         </metadata>
 	</port>
 </ports>

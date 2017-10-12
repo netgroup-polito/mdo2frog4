@@ -16,9 +16,9 @@ GRAPH_XML_FILE = '.domainConfiguration.xml'
 '''
 	Information to be exported
 '''
-INFRASTRUCTURE_NAME = 'Single node'
+INFRASTRUCTURE_NAME = 'TIM-TO'
 INFRASTRUCTURE_ID = 'UUID001'
-NODE_NAME = 'Domain'
+NODE_NAME = 'Tilab_Domain'
 NODE_ID = 'UUID11'
 NODE_TYPE = 'BisBis'
 

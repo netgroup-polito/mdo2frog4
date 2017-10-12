@@ -12,5 +12,10 @@
 		<name>163.162.234.30/eth8</name>
 		<port_type>port-sap</port_type>
 		<sap>sap1</sap>
+		<sap_data>
+			<resources>
+				<delay>1 ms </delay>
+			</resources>
+		</sap_data>
 	</port>
 </ports>
