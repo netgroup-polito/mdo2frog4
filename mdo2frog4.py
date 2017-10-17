@@ -262,14 +262,19 @@ def extractVNFsInstantiated(content):
         LOG.warning("This VNF will be disregarded by the Orchestrator if it already exists, or created if it does not exist")
         
     for instance in alreadyInstantiatedNFs:
-        vnf = manageVNFs(instance)
+        vnf = manageVNFs(instance, nfinstances)
         if vnf is None:
             continue
         else:
-            nfinstances.append(vnf)
+            # Check if the already instantiated NFs needs to be deleted, otherwise will be a duplicate within the NF instance and the VNF will never be deleted
+            for newInstance in instances:
+                if newInstance.get_operation() == 'delete' and newInstance.id.get_value() == vnf.id:
+                    break
+                else:
+                    nfinstances.append(vnf)
 
     for instance in instances:
-        vnf = manageVNFs(instance)
+        vnf = manageVNFs(instance, nfinstances)
         if vnf is None:
             continue
         else:
@@ -277,7 +282,7 @@ def extractVNFsInstantiated(content):
 
     return nfinstances
 
-def manageVNFs(instance):
+def manageVNFs(instance, nfinstances):
     
     if instance.get_operation() == 'delete':
         graph_id=instance.id.get_value()
@@ -346,7 +351,10 @@ def manageVNFs(instance):
                     unify_ip = l3_address.requested.get_as_text()
 
             mac = port.addresses.l2.get_value()
-            port_id_nffg = int(port_id)
+            try:
+                port_id_nffg = int(port_id)
+            except Exception as ex:
+                port_id_nffg = port_id
             port_list.append(Port(_id="port:"+str(port_id_nffg), unify_ip=unify_ip, mac=mac))
         if port.control.orchestrator.get_as_text() is not None:
             unify_env_variables.append("CFOR="+port.control.orchestrator.get_as_text())
@@ -648,7 +656,11 @@ def extractRules(content):
             #XXX I'm using the port ID as name of the port
             vnf = port.get_parent().get_parent()
             vnf_id = vnf.id.get_value()
-            port_id = int(port.id.get_value())
+            #port_id = int(port.id.get_value())
+            try:
+                port_id_nffg = int(port.id.get_value())
+            except Exception as ex:
+                port_id_nffg = port.id.get_value()
             flowrule.actions.append(Action(output = "vnf:" + vnf_id + ":port:" + str(port_id)))
 
             # Check if this VNF port has L4 configuration. In this case rules cannot involve such port
@@ -1139,9 +1151,18 @@ def mdo2frog4Init():
 
         portObject = Virt_Port(id=str(portID), name=port_description['as'], port_type=port_description['port-type'], sap=port_description['sap'])
         if port.find('sap_data') is not None:
-            delay = port.find('sap_data').find('resources').find('delay').text
-            if delay is not None:
-                portObject.sap_data.resources.delay.set_value(delay)
+            
+            if port.find('sap_data').find('resources') is not None:
+                delay = port.find('sap_data').find('resources').find('delay').text
+            
+                if delay is not None:
+                    portObject.sap_data.resources.delay.set_value(delay)    
+            
+            if port.find('sap_data').find('role') is not None:
+                role = port.find('sap_data').find('role').text
+                
+                if role is not None:
+                    portObject.sap_data.role.set_value(role)
         domain.ports.add(portObject)
         portID = portID + 1
 

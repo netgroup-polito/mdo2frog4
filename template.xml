@@ -16,7 +16,29 @@
 		<port>
 			<id>2</id>
 			<name>to_customer_fake</name>
+			<port_type>port-sap</port_type>
+		</port>
+	</ports>
+</node>
+<node>
+	<id>2</id>
+	<name>iperf_server</name>
+	<type>iperf_server</type>
+	<ports>
+		<port>
+			<id>0</id>
+			<name>management</name>
 			<port_type>port-abstract</port_type>
+		</port>
+		<port>
+			<id>1</id>
+			<name>to_traffic_shaper</name>
+			<port_type>port-abstract</port_type>
+		</port>
+		<port>
+			<id>2</id>
+			<name>fake_to_SAP</name>
+			<port_type>port-sap</port_type>
 		</port>
 	</ports>
 </node>

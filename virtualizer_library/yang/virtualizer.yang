@@ -101,6 +101,10 @@ module virtualizer {
         description "e.g., ('IEEE802.1q': '0x00c', 'MPLS': 70, 'IEEE802.1q')";
         type string;
       }
+      leaf role {
+        description "(provider|consumer), where the default is consumer; if field is absent we assume the default consumer role";
+        type string;
+      }
       container resources{
         description "Only used for domain boundary ports (port-sap type), where this is used to derive interconnection link characteristics.";
         uses link-resource;

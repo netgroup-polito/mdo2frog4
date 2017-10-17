@@ -1,0 +1,21 @@
+<name>Tilab_Domain</name>
+<type>BisBis</type>
+<ports>
+	<port>
+		<id>1</id>
+		<name>of:000064e9505a8a40/5108</name>
+		<port_type>port-sap</port_type>
+		<sap>sap7</sap>
+	</port>
+	<port>
+		<id>2</id>
+		<name>163.162.234.30/eth8</name>
+		<port_type>port-sap</port_type>
+		<sap>sap1</sap>
+		<sap_data>
+			<resources>
+				<delay>1 ms </delay>
+			</resources>
+		</sap_data>
+	</port>
+</ports>

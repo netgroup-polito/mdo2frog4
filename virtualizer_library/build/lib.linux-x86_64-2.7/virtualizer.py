@@ -377,11 +377,14 @@ class Infra_node(ListedYang, GroupingInfra_node):
 
 # YANG construct: container sap_data
 class PortSap_data(Yang):
-    def __init__(self, tag="sap_data", parent=None, technology=None, resources=None):
+    def __init__(self, tag="sap_data", parent=None, technology=None, role=None, resources=None):
         super(PortSap_data, self).__init__(tag, parent)
-        self._sorted_children = ["technology", "resources"]
+        self._sorted_children = ["technology", "role", "resources"]
         # yang construct: leaf
         self.technology = StringLeaf("technology", parent=self, value=technology)
+        """:type: StringLeaf"""
+        # yang construct: leaf
+        self.role = StringLeaf("role", parent=self, value=role)
         """:type: StringLeaf"""
         # yang construct: container
         self.resources = None
