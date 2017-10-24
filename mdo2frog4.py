@@ -95,7 +95,7 @@ class DoEditConfig:
         '''
         Edit the status of the domain
         '''
-        global unify_monitoring, fakevm
+        global unify_monitoring, fakevm, corr_graphids
         try:
             LOG.info("Executing the 'edit-config' command")
             # check if this request comes from Escape
@@ -124,7 +124,7 @@ class DoEditConfig:
             
             if corr_graphids is not None:
                 updated = tryToUpdate(content)
-                vnfsToBeAdded = extractVNFsInstantiated(updated)    #VNF deployed/to be deployed on the controlled domain (eg. frog4 orchestrator)
+                #vnfsToBeAdded = extractVNFsInstantiated(updated)    #VNF deployed/to be deployed on the controlled domain (eg. frog4 orchestrator)
                 rulesToBeAdded, endpoints = extractRules(updated)    #Flowrules and endpoints installed/to be installed on the controlled domain (eg. frog4 orchestrator)
                 resp_update = sendUpdateToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
                 if resp_update == 404:
@@ -260,25 +260,22 @@ def extractVNFsInstantiated(content):
     if instances is None:
         LOG.warning("Update of VNF is not supported by the UN! vnf: {0}".format(instance.id.get_value()))
         LOG.warning("This VNF will be disregarded by the Orchestrator if it already exists, or created if it does not exist")
-        
+
+    for newInstance in instances:
+        if newInstance.get_operation() == 'delete':
+            position = 0
+            for instance in alreadyInstantiatedNFs:
+                if instance.id.get_value() == newInstance.id.get_value():
+                    alreadyInstantiatedNFs.remove(instance)
+                    break
+                position += 1
+        elif newInstance.get_operation() == 'create':
+            vnf = manageVNFs(newInstance, nfinstances)
+            nfinstances.append(vnf)
+
     for instance in alreadyInstantiatedNFs:
         vnf = manageVNFs(instance, nfinstances)
-        if vnf is None:
-            continue
-        else:
-            # Check if the already instantiated NFs needs to be deleted, otherwise will be a duplicate within the NF instance and the VNF will never be deleted
-            for newInstance in instances:
-                if newInstance.get_operation() == 'delete' and newInstance.id.get_value() == vnf.id:
-                    break
-                else:
-                    nfinstances.append(vnf)
-
-    for instance in instances:
-        vnf = manageVNFs(instance, nfinstances)
-        if vnf is None:
-            continue
-        else:
-            nfinstances.append(vnf)
+        nfinstances.append(vnf)
 
     return nfinstances
 
@@ -413,7 +410,7 @@ def extractRules(content):
     Returns the rules and the endpoints in the internal format of the nffg_library
     '''
 
-    LOG.debug("Extracting the flowrules to be installed in the controlled domain (eg. frog4 orchestrator)")
+    LOG.debug("******************************************Extracting the flowrules to be installed in the controlled domain (eg. frog4 orchestrator)******************************************")
 
     try:
         tree = ET.parse(constants.GRAPH_XML_FILE)
@@ -656,13 +653,8 @@ def extractRules(content):
             #XXX I'm using the port ID as name of the port
             vnf = port.get_parent().get_parent()
             vnf_id = vnf.id.get_value()
-            #port_id = int(port.id.get_value())
-            try:
-                port_id_nffg = int(port.id.get_value())
-            except Exception as ex:
-                port_id_nffg = port.id.get_value()
+            port_id = int(port.id.get_value())
             flowrule.actions.append(Action(output = "vnf:" + vnf_id + ":port:" + str(port_id)))
-
             # Check if this VNF port has L4 configuration. In this case rules cannot involve such port
             if domain.NF_instances[vnf_id].ports[port.id.get_value()].addresses.l4.get_value() is not None:
                 LOG.error("It is not possibile to install flows related to a VNF port that has L4 configuration")

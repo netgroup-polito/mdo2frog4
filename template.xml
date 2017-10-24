@@ -60,7 +60,7 @@
 		<port>
 			<id>2</id>
 			<name>to_onos_domain</name>
-			<port_type>port-abstract</port_type>
+			<port_type>port-sap</port_type>
 		</port>
 	</ports>
 </node>
