@@ -123,14 +123,14 @@ class DoEditConfig:
                 rulesToBeAdded = connectEndpoints(rulesToBeAdded)
             
             if corr_graphids is not None:
-                updated = tryToUpdate(content)
-                #vnfsToBeAdded = extractVNFsInstantiated(updated)    #VNF deployed/to be deployed on the controlled domain (eg. frog4 orchestrator)
-                #rulesToBeAdded, endpoints = extractRules(updated)    #Flowrules and endpoints installed/to be installed on the controlled domain (eg. frog4 orchestrator)
+                # This was part of an old fix on the update
+                # updated = tryToUpdate(content)
+                # vnfsToBeAdded = extractVNFsInstantiated(updated)    #VNF deployed/to be deployed on the controlled domain (eg. frog4 orchestrator)
+                # rulesToBeAdded, endpoints = extractRules(updated)    #Flowrules and endpoints installed/to be installed on the controlled domain (eg. frog4 orchestrator)
                 resp_update = sendUpdateToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
                 if resp_update == 404:
                     sendToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
             else:
-                corr_graphids = "1234"
                 sendToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
             #Updates the file containing the current status of the controlled domain (eg. frog4 orchestrator), by editing the #<flowtable> and the <NF_instances> and returning the xml
             un_config = updateDomainStatus(content)
