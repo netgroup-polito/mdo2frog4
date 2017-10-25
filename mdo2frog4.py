@@ -125,11 +125,12 @@ class DoEditConfig:
             if corr_graphids is not None:
                 updated = tryToUpdate(content)
                 #vnfsToBeAdded = extractVNFsInstantiated(updated)    #VNF deployed/to be deployed on the controlled domain (eg. frog4 orchestrator)
-                rulesToBeAdded, endpoints = extractRules(updated)    #Flowrules and endpoints installed/to be installed on the controlled domain (eg. frog4 orchestrator)
+                #rulesToBeAdded, endpoints = extractRules(updated)    #Flowrules and endpoints installed/to be installed on the controlled domain (eg. frog4 orchestrator)
                 resp_update = sendUpdateToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
                 if resp_update == 404:
                     sendToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
             else:
+                corr_graphids = "1234"
                 sendToOrchestrator(rulesToBeAdded,vnfsToBeAdded, endpoints)    #Sends the new VNFs and flow rules to the controlled domain (eg. frog4 orchestrator)
             #Updates the file containing the current status of the controlled domain (eg. frog4 orchestrator), by editing the #<flowtable> and the <NF_instances> and returning the xml
             un_config = updateDomainStatus(content)
@@ -422,6 +423,12 @@ def extractRules(content):
     tmpInfrastructure = Virtualizer.parse(root=tree.getroot())
     supportedNFs = tmpInfrastructure.nodes.node[constants.NODE_ID].capabilities.supported_NFs
     alreadyInstantiatedNFs = tmpInfrastructure.nodes.node[constants.NODE_ID].NF_instances
+    tempFlows = tmpInfrastructure.nodes.node[constants.NODE_ID].flowtable
+    
+    # Here I create a temporary list where I put all the flowrule already instantiated on the underlying domain
+    alreadyInstantiatedFlows = []
+    for flow in tempFlows:
+        alreadyInstantiatedFlows.append(flow)
 
     try:
         tree = ET.ElementTree(ET.fromstring(content))
@@ -436,10 +443,27 @@ def extractRules(content):
     for vnf in alreadyInstantiatedNFs:
         domain.NF_instances.add(vnf)
     
-    flowtable = domain.flowtable
+    newflowtable = domain.flowtable
     instances = domain.NF_instances
     for instance in instances :
         first_id = instance.id.get_value()
+    
+    flowtable = []
+    
+    # for each flowrule already instantiated, I check if it needs to be deleted or not,  and if there's a new one I add it to the list
+    for newFlowrule in newflowtable:
+        if newFlowrule.get_operation() == 'delete':
+            position = 0
+            for flow in alreadyInstantiatedFlows:
+                if flow.id.get_value() == newFlowrule.id.get_value():
+                    alreadyInstantiatedFlows.remove(flow)
+                    break
+                position += 1
+        elif newFlowrule.get_operation() == 'create':
+            alreadyInstantiatedFlows.append(newFlowrule)
+
+    for flow in alreadyInstantiatedFlows:
+        flowtable.append(flow)
 
     endpoints_dict = {}
     #Add the endpoint for the managment interface. This is a vlan type endpoint and the vlan id must correspond to the management vlan
@@ -471,23 +495,10 @@ def extractRules(content):
     flowrules.append(tmp_flowrule2)
     '''
     for flowentry in flowtable:
-
-        if flowentry.get_operation() is None:
-            LOG.warning("Update of Flowrules is not supported by the UN! vnf: {0}".format(flowentry.id.get_value()))
-            LOG.warning("This Flowrule will be disregarded by the Orchestrator if it already exists or created if it doesn't exist")
-            #continue
-            #LOG.error("Update of flowentry is not supported by the UN! flowentry: " + flowentry.id.get_value())
-            #LOG.error("If you want to create a new flowentry please set \"operation=create\" to the flowentry element")
-            #raise ClientError("Update of flowentry is not supported by the UN! vnf: "+flowentry.id.get_value())
-
-        elif flowentry.get_operation() == 'delete':
+        
+        if flowentry.get_operation() == 'delete':
             #This rule has to be removed from the graph
             continue
-
-        elif flowentry.get_operation() != 'create':
-            LOG.error("Unsupported operation for flowentry: " + flowentry.id.get_value())
-            raise ClientError("Unsupported operation for flowentry: " + flowentry.id.get_value())
-
 
         flowrule = FlowRule()
 
