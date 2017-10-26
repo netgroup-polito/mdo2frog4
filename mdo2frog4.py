@@ -1005,12 +1005,14 @@ def sendUpdateToOrchestrator(rules, vnfs, endpoints):
                 LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
                 if responseFromFrog.status_code == 200 or responseFromFrog.status_code == 204:
                     LOG.info("Graph successfully deleted")
+                    corr_graphids = None
                 elif responseFromFrog.status_code == 401 or responseFromFrog.status_code == 404:
                     getToken()
                     responseFromFrog = requests.delete(url, headers=headers)
                     LOG.debug("Status code received from the orchestrator: %s",responseFromFrog.status_code)
                     if responseFromFrog.status_code == 200 or responseFromFrog.status_code == 204:
                         LOG.info("Graph successfully deleted") #TODO: da aggiornare con l'id del grafo restituito dalla put
+                        corr_graphids = None
                     else:
                         LOG.error("Something went wrong while deleting the graph on the orchestrator")
                         raise ServerError("Something went wrong while deleting the graph on the orchestrator")
